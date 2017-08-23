@@ -124,7 +124,7 @@ Begin {
 
     $Results = @()
 
-    $Activity = "Remove and re-import module(s)"
+    $Activity = "Remove/import module(s)"
     $Msg = $Activity
     Write-Verbose $Msg
 
@@ -137,79 +137,90 @@ Process {
        $Output.Module = $M
 
         Try {
+            
+            [switch]$IsLoaded = $True
+            If (-not ($ModuleObj = Get-Module $M @StdParams)) {
 
-            If ($ModuleObj = Get-Module $M @StdParams) {
-                
+                $Msg = "Module '$M' is not currently loaded"
+                Write-Warning $Msg
+                [switch]$IsLoaded = $False
+
+                If (-not ($ModuleObj = Get-Module $M -ListAvailable @StdParams)) {
+                    $Msg = "Module '$M' not found in any module directory in path"
+                    $Host.UI.WriteErrorLine("ERROR: $Msg")
+                    Return
+                }
+            }
+
+            If ($ModuleObj) {
                 $Total = (($ModuleObj -as [array]).Count)
                 $Current = 0
 
+                $Msg = "$Total module(s) found"
+                Write-Verbose $Msg
+
                 Foreach ($Obj in $ModuleObj) {
-                    
+                
                     $Current ++
                     Write-Verbose $Obj
-                    
+                
                     $Output = $OutputTemplate.PSObject.Copy()
+
+                    If ($IsLoaded.IsPresent) {
+                        $Output.OldVersion = $Obj.Version
+                        If ($Obj.Version -eq (Get-Module $Obj.Name -ListAvailable @StdParams).Version) {
+                            $Msg = "Currently-loaded version of module '$($Obj.Name)' is identical to available module version $($Obj.Version)"
+                            Write-Warning $Msg
+                        }
+                    }
+                    Else {$Output.OldVersion = "n/a"}
 
                     $Output.Module     = $Obj.Name
                     $Output.Path       = $Obj.Path
                     $Output.Type       = $Obj.ModuleType
-                    $Output.OldVersion = $Obj.Version
                     $Output.NewVersion = "Error"
                     $Output.Messages   = "Error"
-                    
-                    If ($Obj.Version -eq (Get-Module $Obj.Name -ListAvailable @StdParams).Version) {
-                        $Msg = "Current version of module '$($Obj.Name)' is identical to available module version $($Obj.Version)"
-                        Write-Warning $Msg
-                    }
-                    
+                
                     Write-Progress -Activity $Activity -CurrentOperation $Obj.Name -PercentComplete ($Current / $Total * 100)
 
-                    $Msg = "Remove module"
-                    If ($PSCmdlet.ShouldProcess($($Obj.Name),$Msg)) {
-                        Try {
-                            $Null = $Obj | Remove-Module -Force -Confirm:$False @StdParams
-
-                            $Msg = "Re-import module"
-                            If ($PSCmdlet.ShouldProcess($Obj.Name,$Msg)) {
-                                
-                                $Null = Get-Module $Obj.Name -ListAvailable @StdParams | Import-Module -Force @StdParams
-                                $Obj = Get-Module $Obj.Name @StdParams
-                                
-                                $Output.NewVersion = $Obj.Version
-                                $Output.Messages = $Null
+                    If ($IsLoaded.IsPresent) {
+                        $Msg = "Remove module"
+                        If ($PSCmdlet.ShouldProcess($($Obj.Name),$Msg)) {
+                            Try {
+                                $Null = $Obj | Remove-Module -Force -Confirm:$False @StdParams
                             }
-                            Else {
-                                $Msg = "Re-import of module '$($Obj.Name)' cancelled by user"
-                                Write-Verbose $Msg
-                                $Output.NewVersion = $Null
-                                $Output.Messages = $Msg
+                            Catch {
+                                $Msg = "Module removal failed for $($ModuleObj.Name)"
+                                $ErrorDetails = $_.Exception.Message
+                                $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
+                                $Output.Messages = $ErrorDetails
                             }
                         }
-                        Catch {
-                            $Msg = "Module removal failed for $($ModuleObj.Name)"
-                            $ErrorDetails = $_.Exception.Message
-                            $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
-                            $Output.Messages = $ErrorDetails
+                        Else {
+                            $Msg = "Module removal cancelled by user"
+                            Write-Warning $Msg
+                            $Output.Messages = $Msg
                         }
-            
+                    }
+                
+                    $Msg = "Import module"
+                    If ($PSCmdlet.ShouldProcess($Obj.Name,$Msg)) {
+                        $Null = Get-Module $Obj.Name -ListAvailable @StdParams | Import-Module -Force @StdParams
+                        $Obj = Get-Module $Obj.Name @StdParams
+                    
+                        $Output.NewVersion = $Obj.Version
+                        $Output.Messages = $Null
                     }
                     Else {
-                        $Msg = "Removal of module '$($Obj.Name)' cancelled by user"
-                        $Host.UI.WriteErrorLine($Msg)
+                        $Msg = "Import of module '$($Obj.Name)' cancelled by user"
+                        Write-Verbose $Msg
                         $Output.NewVersion = $Null
                         $Output.Messages = $Msg
                     }
 
                     $Results += $Output 
                 } #end for each module found
-            }
-            Else {
-                $Msg = "Module '$M' not found/loaded"
-                $Host.UI.WriteErrorLine("ERROR: $Msg")
-                $Output.Messages = $Msg
-
-                $Results += $Output
-            }
+            } # end if module
         }
         Catch {
             $Msg = "Module lookup failed for '$M'"
@@ -217,9 +228,11 @@ Process {
             $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
             $Output.Messages = $ErrorDetails
 
-            $Results += $Output
+            $Results += $Output        
         }
-    }
+        
+        
+    } # end for each module
     
 }
 End {

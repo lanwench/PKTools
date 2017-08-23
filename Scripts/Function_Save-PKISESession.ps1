@@ -1,6 +1,4 @@
-﻿# From https://itfordummies.net/2014/10/27/save-restore-powershell-ise-opened-scripts/
-# https://stackoverflow.com/questions/3710374/get-encoding-of-a-file-in-windows
-
+﻿#requires -version 3
 Function Save-PKISESession{
 <#
 .SYNOPSIS 
@@ -9,7 +7,6 @@ Function Save-PKISESession{
 .DESCRIPTION
     Saves open tabs in current ISE session to a file
     
-
 .NOTES
     Name    : Function_Save-PKISESession.ps1
     Author  : Paula Kingsley
@@ -195,67 +192,6 @@ Process{
     }
 }
 } #end Save-PKISESession
-
-
-
-Function Restore-PKISESession{
-    [CmdletBinding(
-        SupportsShouldProcess = $True,
-        ConfirmImpact = "High"
-    )]
-    Param(
-        [Parameter(Position=0)]
-        [ValidateNotNullOrEmpty()]
-        [ValidateScript({If (Test-Path $_) {$True}})]
-        [String]$ImportPath = "$env:temp\ISESession.txt"
-    )
-    Process{
-        Try {
-            If ([byte[]]$bytes = Get-Content -Encoding byte -ReadCount 4 -TotalCount 4 -Path $ImportPath -ErrorAction SilentlyContinue){
-                    
-                Switch -regex ('{0:x2}{1:x2}{2:x2}{3:x2}' -f $bytes[0],$bytes[1],$bytes[2],$bytes[3]) {
-                    '^efbbbf'   { $Type = 'UTF8' }
-                    '^2b2f76'   { $Type = 'UTF7' }
-                    '^fffe'     { $Type = 'Unicode' }
-                    '^feff'     { $Type = 'BigendianUnicode' }
-                    '^0000feff' { $Type = 'UTF32' }
-                    default     { $Type = 'ASCII' }
-                }
-                If ($Type -eq "ASCII") {
-                    $Msg = "Can't import invalid file type '$SavePath'"
-                    $Host.UI.WriteErrorLine($Msg)
-                    Break
-                }
-                Else {
-                    $Msg = "Open $((Get-Content $ImportPath).Split(",").Count) saved tab(s) from $Type file $ImportPath"
-                    Write-Verbose $Msg
-                    If ($PSCmdlet.ShouldProcess($Env:ComputerName,$Msg)) {
-                        Try {
-                            Invoke-Expression (Get-Content $ImportPath)  -EA Stop -Verbose:$False
-                        }
-                        Catch {
-                            $Msg = $_.Exception.Message
-                            $Host.UI.WriteErrorLine($Msg)
-                        }
-                    }
-                    Else {
-                        $Msg = "Operation cancelled by user"
-                        $Host.UI.WriteErrorLine($Msg)
-                    }
-                }
-            }
-            Else {
-                $Msg = "No content available for $ImportPath"
-                $Host.UI.WriteErrorLine($Msg)
-            }
-        }
-        Catch {
-            $Msg = $_.Exception.Message
-            $Host.UI.WriteErrorLine($Msg)
-        }
-    }
-    }
-
 
 
 
