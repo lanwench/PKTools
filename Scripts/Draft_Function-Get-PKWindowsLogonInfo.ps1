@@ -1,6 +1,16 @@
 ﻿#requires -RunAsAdministrator 
 #requires -Version 3 
 function Get-PKWindowsLogonInfo {
+<#
+.Synopsis
+
+.Description
+
+.Notes
+    
+
+
+#>
 [cmdletbinding()]
 param(
     [Int]$Newest = [Int]::MaxValue,
@@ -50,7 +60,7 @@ Begin {
     
 Process {
         
-    $Msg = "Get event log data for $Env:ComputerName "
+    $Msg = "Get event log data for $Env:ComputerName"
     Write-Verbose $Msg
     
     Get-EventLog -ComputerName $ComputerName -LogName Security -InstanceId 4624 @PSBoundParameters |
