@@ -10,12 +10,12 @@ Function Restore-PKISESession {
 .NOTES
     Name    : Function_Restore-PKISESession.ps1
     Author  : Paula Kingsley
-    Version : 1.0.0
+    Version : 1.00.0000
     History :
     
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v1.0.0 - 2016-05-29 - Created script based on links
+        v1.00.0000 - 2016-05-29 - Created script based on links
         
 .LINK
     https://itfordummies.net/2014/10/27/save-restore-powershell-ise-opened-scripts/
@@ -88,18 +88,33 @@ Process{
                 default     { $Type = 'ASCII' }
             }
             If ($Type -eq "ASCII") {
-                $Msg = "Can't import invalid file type '$SavePath'"
+                $Msg = "Can't import invalid file type '$ImportPath'"
                 $Host.UI.WriteErrorLine($Msg)
                 Break
             }
             Else {
 
-                $Msg = "Open $((Get-Content $ImportPath).Split(",").Count) saved tab(s) from $Type file $ImportPath"
+                $Msg = "Open $((Get-Content $ImportPath).Split("/").Count) saved tab(s) from $Type file $ImportPath"
                 Write-Verbose $Msg
 
                 If ($PSCmdlet.ShouldProcess($Env:ComputerName,$Msg)) {
                     Try {
-                        Invoke-Expression (Get-Content $ImportPath) @StdParams
+                        
+                        #$FileNames = ((Get-Content $ImportPath) -split("ise ")) -split("/") -replace('"','')
+                        [array]$FileNames = ( (Get-Content $ImportPath | Where-Object {$_} ) -split('/')) -replace('"','') 
+                        
+                        #Verify files exist
+                        [array]$Reachable = ($FileNames | Where-Object { (Test-Path $_)})
+                        [array]$Unreachable = ($FileNames | Where-Object {-not (Test-Path $_)})
+                        
+                        If ($Unreachable.Count -gt 0) {
+                            $Msg = "File $ImportPath contains $($Unreachable.Count) unreachable file(s) that will not be opened:`n$($Unreachable | Format-List | Out-String)"
+                            Write-Warning $Msg
+                        }
+
+                        $ToImport = """$($Reachable -join(","))"""
+
+                        Invoke-Expression ("ise $ToImport") @StdParams
                     }
                     Catch {
                         $Msg = $_.Exception.Message

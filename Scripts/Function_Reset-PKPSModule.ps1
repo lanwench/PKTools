@@ -1,12 +1,9 @@
 ﻿#requires -version 3
-
-
 Function Reset-PKPSModule {
 <# 
 .Synopsis
-    Removes and re-imports PowerShell modules   
+    Removes and re-imports named PowerShell modules   
     
-
 .DESCRIPTION
    Removes and re-imports PowerShell modules   
    Prompts for confirmation
@@ -14,15 +11,16 @@ Function Reset-PKPSModule {
    
 .NOTES
     Name    : Function_Reset-PKPSModule.ps1
-    Version : 1.0.0
-    Author  : Paula Kingsley
     Created : 2017-06-23
-
+    Version : 01.01.0000
+    Author  : Paula Kingsley
+    
     History:
 
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK *
 
-        v1.0.0 - 2017-06-23 - Created script
+        v01.00.0000 - 2017-06-23 - Created script
+        v01.01.0000 - 2017-09-06 - Added -passthru to Import-Module; minor cosmetic updates
         
 .EXAMPLE
     PS C:\> Get-Module gn* | Reset-PKPSModule -Verbose
@@ -82,12 +80,13 @@ Param(
         ValueFromPipelineByPropertyName = $True,
         HelpMessage = "Name of module, or module object"
     )]
+    [alias("Name")]
     [object[]]$Module
 )
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "1.0.0"
+    [version]$Version = "01.01.0000"
 
     # Generalpurpose splat
     $StdParams = @{}
@@ -156,21 +155,23 @@ Process {
                 $Total = (($ModuleObj -as [array]).Count)
                 $Current = 0
 
-                $Msg = "$Total module(s) found"
-                Write-Verbose $Msg
-
                 Foreach ($Obj in $ModuleObj) {
                 
                     $Current ++
                     Write-Verbose $Obj
                 
                     $Output = $OutputTemplate.PSObject.Copy()
+                    $AvailableVer = (Get-Module $Obj.Name -ListAvailable @StdParams).Version 
 
                     If ($IsLoaded.IsPresent) {
                         $Output.OldVersion = $Obj.Version
-                        If ($Obj.Version -eq (Get-Module $Obj.Name -ListAvailable @StdParams).Version) {
-                            $Msg = "Currently-loaded version of module '$($Obj.Name)' is identical to available module version $($Obj.Version)"
+                        If ($Obj.Version -eq $AvailableVer) {
+                            $Msg = "Loaded version of module '$($Obj.Name)' is identical to available version $AvailableVer"
                             Write-Warning $Msg
+                        }
+                        If (($Obj.Version -gt $AvailableVer) -or ($Obj.Version -lt $AvailableVer)) {
+                            $Msg = "Loaded version of module '$($Obj.Name)' is $($Obj.Version); available version is $AvailableVer"
+                            Write-Verbose $Msg
                         }
                     }
                     Else {$Output.OldVersion = "n/a"}
@@ -184,38 +185,43 @@ Process {
                     Write-Progress -Activity $Activity -CurrentOperation $Obj.Name -PercentComplete ($Current / $Total * 100)
 
                     If ($IsLoaded.IsPresent) {
+                        [switch]$Continue = $False
                         $Msg = "Remove module"
                         If ($PSCmdlet.ShouldProcess($($Obj.Name),$Msg)) {
                             Try {
                                 $Null = $Obj | Remove-Module -Force -Confirm:$False @StdParams
+                                $Continue = $True
                             }
                             Catch {
-                                $Msg = "Module removal failed for $($ModuleObj.Name)"
+                                $Msg = "Module $($Obj.Name)' removal failed"
                                 $ErrorDetails = $_.Exception.Message
                                 $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
                                 $Output.Messages = $ErrorDetails
+                                [switch]$Continue = $False
                             }
                         }
                         Else {
-                            $Msg = "Module removal cancelled by user"
+                            $Msg = "Module '$($Obj.Name)' reset cancelled by user"
                             Write-Warning $Msg
                             $Output.Messages = $Msg
+                            [switch]$Continue = $False
                         }
                     }
-                
-                    $Msg = "Import module"
-                    If ($PSCmdlet.ShouldProcess($Obj.Name,$Msg)) {
-                        $Null = Get-Module $Obj.Name -ListAvailable @StdParams | Import-Module -Force @StdParams
-                        $Obj = Get-Module $Obj.Name @StdParams
+                    Else {$Continue = $True}
                     
-                        $Output.NewVersion = $Obj.Version
-                        $Output.Messages = $Null
-                    }
-                    Else {
-                        $Msg = "Import of module '$($Obj.Name)' cancelled by user"
-                        Write-Verbose $Msg
-                        $Output.NewVersion = $Null
-                        $Output.Messages = $Msg
+                    If ($Continue.IsPresent) {
+                        $Msg = "Import module"
+                        If ($PSCmdlet.ShouldProcess($Obj.Name,$Msg)) {
+                            $Import = Get-Module $Obj.Name -ListAvailable @StdParams | Import-Module -PassThru -Force -Global @StdParams
+                            $Output.NewVersion = $Import.Version
+                            $Output.Messages = $Null
+                        }
+                        Else {
+                            $Msg = "Import of module '$($Obj.Name)' cancelled by user"
+                            Write-Verbose $Msg
+                            $Output.NewVersion = $Null
+                            $Output.Messages = $Msg
+                        }
                     }
 
                     $Results += $Output 

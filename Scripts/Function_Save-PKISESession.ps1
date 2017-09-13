@@ -172,13 +172,22 @@ Process{
         }
     }
 
-    $Msg = "Save $($psISE.PowerShellTabs.Files.Count) current tab(s) to $SavePath"
+    $Msg = "Save $($psISE.PowerShellTabs.Files.Count) current tab(s) to '$SavePath'"
     Write-Verbose $Msg
     If ($PSCmdlet.ShouldProcess($Env:ComputerName,$Msg)) {
         Try {
             $psISE.CurrentPowerShellTab.Files | Foreach-Object {$_.SaveAs($_.FullPath)}
-            "ise ""$($psISE.PowerShellTabs.Files.FullPath -join',')""" | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
-            $Msg = "Saved open tabs to file"
+            #"ise ""$($psISE.PowerShellTabs.Files.FullPath -join'/')""" | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
+            
+            # Using forward spash for delimiter as we may have commas or semicolons in the filename
+
+            #"""$($psISE.PowerShellTabs.Files.FullPath -join'/')""" | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
+            $($psISE.PowerShellTabs.Files.FullPath -join'/') | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
+
+            #"ise ""$($psISE.PowerShellTabs.Files.FullPath -join',')""" | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
+            #"ise ""$($psISE.PowerShellTabs.Files.FullPath -join'";"')""" | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
+            
+            $Msg = "Saved $($psISE.CurrentPowerShellTab.Files.count) tab(s) to file '$SavePath'"
             Write-Verbose $Msg
         }
         Catch {

@@ -235,9 +235,9 @@ Process {
         $Msg = $Computer
         Write-Verbose $Msg
 
-        Write-Progress -Activity $Activity -CurrentOperation $Current -PercentComplete ($Current /$Total * 100)
+        Write-Progress -Activity $Activity -CurrentOperation $Current -PercentComplete ($Current / $Total * 100)
         
-        $Msg = "Install package '$Sysinternals'"
+        $Msg = "`n`n`tInstall Chocolatey package '$Package'`n`n"
         If ($PSCmdlet.ShouldProcess($Computer,$Msg)) {
 
             Try {
@@ -252,7 +252,7 @@ Process {
         }
         Else {
             $Msg = "Job execution on $Computer cancelled by user"
-            Write-Warning $Msg
+            $Host.UI.WriteErrorLine($Msg)
         }
     } # end foreach 
 }
