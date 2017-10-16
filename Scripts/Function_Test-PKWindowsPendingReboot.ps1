@@ -1,5 +1,4 @@
-﻿
-#requires -Version 3
+﻿#requires -Version 3
 function Test-PKWindowsPendingReboot {
 <#
 .SYNOPSIS
@@ -9,26 +8,147 @@ function Test-PKWindowsPendingReboot {
     Invokes a PSJob using Invoke-Command to test the pending reboot status of a computer
     Optionally performs a WinRM connection test before attempting job invocation
     Accepts pipeline input
-    Output is a PSObject or boolean
-    Returns a PSJob
+    Scriptblock output is a PSObject or boolean
+    Returns a PSJob or returns job output with optional -WaitForJob switch
     
-
 .NOTES
     Name    : Function_Test-PKWindowsPendingReboot.ps1
     Version : 01.00.0000
     Author  : Paula Kingsley
-    Created : 2016-09-16
+    Created : 2017-09-12
     History :
 
         ** PLEASE KEEP $VERSION UPDATED IN BEGIN BLOCK **
 
-        v01.00.0000 - 2017-09-12 - Created script based on Monimoy Sanyal's original (see gallery link)
+        v01.00.0000 - 2017-09-12 - Created script based on altrive's original (see github link)
 
 .LINK
     https://gist.github.com/altrive/5329377
 
 .LINK
     http://gallery.technet.microsoft.com/scriptcenter/Get-PendingReboot-Query-bdb79542
+
+.EXAMPLE
+    PS C:\> $Arr | Test-PKWindowsPendingReboot -Verbose
+    # Get the pending reboot status of computer names in the pipeline
+
+        VERBOSE: PSBoundParameters: 
+	
+        Key           Value                                    
+        ---           -----                                    
+        Verbose       True                                     
+        ComputerName  {}                        
+        Credential    System.Management.Automation.PSCredential
+        BooleanOutput False                                    
+        ScriptName    Test-PKWindowsPendingReboot              
+        ScriptVersion 1.0.0                                    
+
+
+        VERBOSE: testvm-1
+        VERBOSE: Job ID 10: TestReboot_testvm-1_2017-09-16 10:22:03
+        VERBOSE: foo
+        ERROR: Connection failure on foo
+        VERBOSE: testvm-2
+        VERBOSE: Job ID 12: TestReboot_testvm-2_2017-09-16 10:22:06
+        VERBOSE: 2 job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output
+
+        Id     Name            PSJobTypeName   State         HasMoreData     Location    Command                  
+        --     ----            -------------   -----         -----------     --------    -------                  
+        10     TestReboot_t... RemoteJob       Running       True            testvm-1    ...                      
+        12     TestReboot_t... RemoteJob       Running       True            testvm-2    ...                      
+
+        [...]
+
+        PS C:\> Get-Job 10,12 | Wait-job | Receive-job
+
+        ComputerName                : testvm-1
+        IsPendingReboot             : True
+        ComponentBasedRebootPending : False
+        WindowsUpdateRebootPending  : True
+        PendingFileRenameOperation  : True
+        Messages                    : 
+        PSComputerName              : testvm-1
+        RunspaceId                  : ff5104a2-9d7b-43d8-a61e-b54e0e29e51d
+
+        ComputerName                : testvm-2
+        IsPendingReboot             : True
+        ComponentBasedRebootPending : False
+        WindowsUpdateRebootPending  : False
+        PendingFileRenameOperation  : False
+        Messages                    : 
+        PSComputerName              : testvm-2
+        RunspaceId                  : 4d2ac96d-d085-4fd7-a890-839ef37d6a66
+
+.EXAMPLE
+    $ $Arr | Test-PKWindowsPendingReboot -BooleanOutput -WaitForJob
+    # Get the pending reboot status of computer names in the pipeline, waiting for job output
+
+        ERROR: Connection failure on foo
+
+        IsPendingReboot PSComputerName  RunspaceId                          
+        --------------- --------------  ----------                          
+                   True ops-pktest-1    aa525000-1256-4cc5-81cb-500f2232e13e
+                   True ops-winmgmt-2   c146e5c7-ad05-4025-b7ea-edd9155f4082
+                   True PKINGSLEY-04343 dc280b9b-5dc2-4e72-ac06-5d5318d5993b
+
+
+.EXAMPLE
+    PS C:\> $Arr | Test-PKWindowsPendingReboot -BooleanOutput -SkipConnectionTest -Credential $Credential -Verbose
+    # Get the pending reboot status of computer names in the pipeline, skipping the WinRM connection test and providing credentials
+
+        VERBOSE: PSBoundParameters: 
+	
+        Key                Value                                    
+        ---                -----                                    
+        BooleanOutput      True                                     
+        SkipConnectionTest True                                     
+        Credential         System.Management.Automation.PSCredential
+        Verbose            True                                     
+        ComputerName       {}                        
+        ScriptName         Test-PKWindowsPendingReboot              
+        ScriptVersion      1.0.0                                    
+
+        VERBOSE: testvm-1
+        VERBOSE: Job ID 14: TestReboot_testvm-1_2017-09-16 10:24:43
+        VERBOSE: foo
+        VERBOSE: Job ID 16: TestReboot_foo_2017-09-16 10:24:43
+        VERBOSE: testvm-2
+        VERBOSE: Job ID 18: TestReboot_testvm-2_2017-09-16 10:24:43
+        VERBOSE: 3 job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output
+
+        Id     Name            PSJobTypeName   State         HasMoreData     Location    Command                  
+        --     ----            -------------   -----         -----------     --------    -------                  
+        14     TestReboot_t... RemoteJob       Running       True            testvm-1    ...                      
+        16     TestReboot_f... RemoteJob       Failed        False           foo         ...                      
+        18     TestReboot_t... RemoteJob       Running       True            testvm-2    ...        
+        
+        [...]
+           
+
+        PS C:\> Get-Job 14,16,18 | Receive-job -Keep
+        # Probably should've tested the connection first!
+
+        [foo] Connecting to remote server foo failed with the following error message : WinRM cannot process the request. 
+        The following error occurred while using Kerberos authentication: Cannot find the computer foo. 
+        Verify that the computer exists on the network and that the name provided is spelled correctly. 
+        For more information, see the about_Remote_Troubleshooting Help topic.
+        At line:1 char:1
+        + Get-Job 14,16,18 | Receive-job -Keep
+        + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            + CategoryInfo          : OpenError: (foo:String) [], PSRemotingTransportException
+            + FullyQualifiedErrorId : NetworkPathNotFound,PSSessionStateBroken
+
+
+        [...]
+        # Try again
+
+        PS C:\> Get-Job 14,16,18 | Where-Object {$_.State -eq "Completed"} | Receive-Job | Format-Table
+
+        IsPendingReboot PSComputerName RunspaceId                          
+        --------------- -------------- ----------                          
+                   True testvm-1       82f51e3a-dff1-4147-b995-69ae3b0234a0
+                   True testvm-2       40a452ca-4a65-4708-a942-5af6ab205ace
+
 
 #>
 [Cmdletbinding(
@@ -59,7 +179,33 @@ Param(
         Mandatory=$False,
         HelpMessage="Return boolean output only"
     )]
-    [switch]$BooleanOutput
+    [switch]$BooleanOutput,
+
+    [Parameter(
+        Mandatory=$False,
+        HelpMessage="Don't test WinRM connection before running job"
+    )]
+    [Switch] $SkipConnectionTest,
+
+    [Parameter(
+        Mandatory=$False,
+        HelpMessage="Wait for / get job results"
+    )]
+    [Switch] $WaitForJob,
+
+    [Parameter(
+        Mandatory=$False,
+        HelpMessage="Timeout (in seconds) to wait for job output"
+    )]
+    [ValidateRange(1,300)]
+    [int] $WaitJobTimeout = 30,
+
+    [Parameter(
+        Mandatory   = $False,
+        HelpMessage ="Suppress non-verbose console output"
+    )]
+    [switch] $SuppressConsoleOutput
+
 )
     
 Begin {
@@ -88,6 +234,7 @@ Begin {
         Verbose     = $False
     }
     
+    #region Scriptblock
     # Scriptblock for invoke-command
     $Scriptblock = {
         
@@ -101,17 +248,17 @@ Begin {
         # so select array ensures property order
         $InitialValue = "Error"
         $Output = New-Object PSObject -Property @{
-            ComputerName                         = $Env:ComputerName
-            IsRebootPending                      = $InitialValue
-            ComponentBasedServicingRebootPending = $InitialValue
-            WindowsUpdateRebootPending           = $InitialValue
-            PendingFileRenameOperation           = $InitialValue
-            #SCCM                                 = $InitialValue
-            Messages                             = $InitialValue
+            ComputerName                = $Env:ComputerName
+            IsPendingReboot             = $InitialValue
+            ComponentBasedRebootPending = $InitialValue
+            WindowsUpdateRebootPending  = $InitialValue
+            PendingFileRenameOperation  = $InitialValue
+            #SCCM                        = $InitialValue
+            Messages                    = $InitialValue
         }            
         
-        If ($Bool.IsPresent) {$Select = "IsRebootPending"}
-        Else {$Select = "ComputerName","IsRebootPending","ComponentBasedServicingRebootPending","PendingFileRenameOperation","PendingFileRenameOperation","Messages"}
+        If ($Bool.IsPresent) {$Select = "IsPendingReboot"}
+        Else {$Select = "ComputerName","IsPendingReboot","ComponentBasedRebootPending","WindowsUpdateRebootPending","PendingFileRenameOperation","Messages"}
 
         $Pending = 0
         $ErrMsg = @()
@@ -134,10 +281,10 @@ Begin {
         Try {
             If (Get-Item "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired" -EA SilentlyContinue) { 
                 $Pending ++
-                $Output.WindowsUpdatePending = $True
+                $Output.WindowsUpdateRebootPending = $True
             }
             Else {
-                $Output.WindowsUpdatePending = $False
+                $Output.WindowsUpdateRebootPending = $False
             }
         }
         Catch {
@@ -177,11 +324,16 @@ Begin {
          If ($Pending.Count -gt 0) {$Output.IsPendingReboot = $True}
          Else {$Output.IsPendingReboot = $False}
 
+         If ($ErrMsg.Count -gt 0) {$Output.Messages = $ErrMsg -join("`n")}
+         Else {$Output.Messages = $Null}
+
          # Return the output object
          Return ($Output | Select $Select)    
         
     } #end scriptblock for remote command
+    #endregion Scriptblock
 
+    #region Splats
     # Splat for test-wsman
     $Param_WSMan = @{}
     $Param_WSMan = @{
@@ -216,8 +368,24 @@ Begin {
         Status           = "Working"
     }
 
+    #endregion Splats
+
     # Output arrays
     $Jobs = @()
+
+    # Console output
+    $BGColor = $host.UI.RawUI.BackgroundColor
+    $Msg = "Action: $Activity"
+    $FGColor = "Yellow"
+    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
+    Else {Write-Verbose $Msg}
+
+    If ($WaitForJob.IsPresent) {
+        $Msg = "You have selected -WaitForJob, which waits $WaitJobTimeout second(s) for job results.`nIt will *not* return information on failed or running jobs. `nYou should run 'Get-Job #' to ensure you have retrieved all job information, including failures."
+        Write-Warning $Msg
+    }
+
+
 
 }
 Process {    
@@ -239,9 +407,8 @@ Process {
         Write-Verbose $Computer
         Write-Progress @Param_WP
 
-        #If ($PSCmdlet.ShouldProcess($Computer,$Activity)) {
-        If ($Computer) {
-
+        If ($PSCmdlet.ShouldProcess($Computer,$Activity)) {
+        
             If (-not $SkipConnectionTest.IsPresent) {
             
                 If ($Null = Test-WSMan @Param_WSMan ) {$Continue = $True}
@@ -289,13 +456,38 @@ Process {
 End {
 
     If ($Jobs.Count -gt 0) {
-        $Msg = "$($Jobs.Count) job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output"
-        Write-Verbose $Msg
-        $Jobs | Get-Job
+        
+        If ($WaitForJob.IsPresent) {
+            $Msg = "$($Jobs.Count) job(s) created; waiting $WaitForJob second(s) for output and removing completed jobs"
+            Write-Verbose $Msg
+            $Activity = $Msg
+            Write-Progress -Activity $Activity
+
+            Try {
+                $Results = $Jobs | Get-Job | Wait-Job -Timeout $WaitJobTimeout | Receive-Job -ErrorAction SilentlyContinue
+                If ($Jobs | Get-Job | Where-Object {($_.State -ne "Completed") -or ($_.HasMoreData -eq $False)}) {
+                    $Msg = "Not all jobs completed within the $WaitJobTimeout-second timeout period. Please run 'Get-Job -Id #'"
+                    Write-Warning $Msg
+                }
+                Write-Output $Results
+            }
+            Catch {
+                $Msg = "Please check job output manually using 'Get-Job -Id #' "
+                $ErrorDetails = $_.Exception.Message
+                $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
+            }
+        }
+
+        Else {
+            $Msg = "$($Jobs.Count) job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output"
+            Write-Verbose $Msg
+            $Jobs | Get-Job
+        }
+        
     }
     Else {
         $Msg = "No jobs created"
         $Host.UI.WriteErrorLine($Msg)
     }
 }
-}
+} #end Test-PKWindowsPendingReboot
