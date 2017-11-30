@@ -12,13 +12,13 @@
 RootModule = 'PKTools.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.04.0000'
+ModuleVersion = '1.05.0000'
 
 # ID used to uniquely identify this module
 GUID = '3a49eaff-5e0f-41db-b149-3dc1f36968c1'
 
 # Author of this module
-Author = 'pkingsley'
+Author = 'Paula Kingsley'
 
 # Company or vendor of this module
 CompanyName = 'Amalgamated Toothpick, Inc'

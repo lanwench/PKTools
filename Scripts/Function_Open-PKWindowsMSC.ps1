@@ -87,7 +87,7 @@ Param(
 DynamicParam{
 
     # Set the dynamic parameters' name
-    $ParamName_portgroup = 'Local'
+    $ParamName_Local = 'Local'
     # Create the collection of attributes
     $AttributeCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
     # Create and set the parameters' attributes
@@ -105,12 +105,12 @@ DynamicParam{
     # Add the ValidateSet to the attributes collection
     $AttributeCollection.Add($ValidateSetAttribute)
     # Create and return the dynamic parameter
-    $RuntimeParameter = New-Object System.Management.Automation.RuntimeDefinedParameter($ParamName_portgroup, [string], $AttributeCollection)
-    $RuntimeParameterDictionary.Add($ParamName_portgroup, $RuntimeParameter)
+    $RuntimeParameter = New-Object System.Management.Automation.RuntimeDefinedParameter($ParamName_Local, [string], $AttributeCollection)
+    $RuntimeParameterDictionary.Add($ParamName_Local, $RuntimeParameter)
 
     
     # Set the dynamic parameters' name
-    $ParamName_datastore = 'Domain'
+    $ParamName_Domain = 'Domain'
     # Create the collection of attributes
     $AttributeCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
     # Create and set the parameters' attributes
@@ -126,8 +126,8 @@ DynamicParam{
     # Add the ValidateSet to the attributes collection
     $AttributeCollection.Add($ValidateSetAttribute)
     # Create and return the dynamic parameter
-    $RuntimeParameter = New-Object System.Management.Automation.RuntimeDefinedParameter($ParamName_datastore, [string], $AttributeCollection)
-    $RuntimeParameterDictionary.Add($ParamName_datastore, $RuntimeParameter)
+    $RuntimeParameter = New-Object System.Management.Automation.RuntimeDefinedParameter($ParamName_Domain, [string], $AttributeCollection)
+    $RuntimeParameterDictionary.Add($ParamName_Domain, $RuntimeParameter)
     return $RuntimeParameterDictionary
 
 }
