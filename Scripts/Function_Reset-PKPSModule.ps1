@@ -12,7 +12,7 @@ Function Reset-PKPSModule {
 .NOTES
     Name    : Function_Reset-PKPSModule.ps1
     Created : 2017-06-23
-    Version : 01.01.0000
+    Version : 01.02.0000
     Author  : Paula Kingsley
     
     History:
@@ -21,50 +21,72 @@ Function Reset-PKPSModule {
 
         v01.00.0000 - 2017-06-23 - Created script
         v01.01.0000 - 2017-09-06 - Added -passthru to Import-Module; minor cosmetic updates
-        
+        v02.00.0000 - 2017-12-01 - Overhauled, cosmetic updates, now imports module if not loaded
+
 .EXAMPLE
-    PS C:\> Get-Module gn* | Reset-PKPSModule -Verbose
+    PS C:\> Reset-PKPSModule -Module pktools -Verbose
 
-        VERBOSE: Remove and re-import module(s)
-        VERBOSE: GNOpsActiveDirectory
-        WARNING: Current version of module 'GNOpsActiveDirectory' is identical to available module version 2.4.11
-        VERBOSE: GNOpsTools
-        WARNING: Current version of module 'GNOpsTools' is identical to available module version 3.9.14
-        VERBOSE: GNOpsWindowsChef
-        WARNING: Current version of module 'GNOpsWindowsChef' is identical to available module version 2.5.0
-        Removal of module 'GNOpsWindowsChef' cancelled by user
-        VERBOSE: GNOpsWindowsVM
-        WARNING: Current version of module 'GNOpsWindowsVM' is identical to available module version 5.1.6
+        VERBOSE: PSBoundParameters: 
+	
+        Key                   Value           
+        ---                   -----           
+        Module                {pktools}       
+        Verbose               True            
+        SuppressConsoleOutput False           
+        ScriptName            Reset-PKPSModule
+        ScriptVersion         1.1.0           
+
+        Action: Remove/import module(s)
+        VERBOSE: Module name: pktools
+        WARNING: Module 'pktools' is not currently loaded
+        VERBOSE: Module imported successfully
 
 
-        Module     : GNOpsActiveDirectory
-        Path       : C:\Users\jbloggs\Git\Gracenote\Infrastructure\PowerShell\GNOpsActiveDirectory\GNOpsActiveDirectory.psm1
-        Type       : Script
-        OldVersion : 2.4.11
-        NewVersion : 2.4.11
-        Messages   : 
+        ComputerName : WORKSTATION14
+        Name         : PKTools
+        IsReset      : True
+        Path         : C:\Users\jbloggs\scripts\PKTools\PKTools.psd1
+        Type         : Script
+        OldVersion   : -
+        NewVersion   : 1.6.1
+        Messages     : Module imported successfully        
 
-        Module     : GNOpsTools
-        Path       : C:\Users\jbloggs\Git\Gracenote\Infrastructure\PowerShell\GNOpsTools\GNOpsTools.psm1
-        Type       : Script
-        OldVersion : 3.9.14
-        NewVersion : 3.9.14
-        Messages   : 
+.EXAMPLE
+    PS C:\> Reset-PKPSModule -Module pktools
 
-        Module     : GNOpsWindowsChef
-        Path       : C:\Users\jbloggs\Git\Gracenote\Infrastructure\PowerShell\GNOpsWindowsChef\GNOpsWindowsChef.psm1
-        Type       : Script
-        OldVersion : 2.5.0
-        NewVersion : 
-        Messages   : Removal of module 'GNOpsWindowsChef' cancelled by user
+        Action: Remove/import module(s)
+        WARNING: Loaded version of module 'PKTools' is identical to available version 1.6.1
+        Module 'PKTools' removal/re-import cancelled by user
 
-        Module     : GNOpsWindowsVM
-        Path       : C:\Users\jbloggs\Git\Gracenote\Infrastructure\PowerShell\GNOpsWindowsVM\GNOpsWindowsVM.psm1
-        Type       : Script
-        OldVersion : 5.1.6
-        NewVersion : 5.1.6
-        Messages   : 
 
+        ComputerName : WORKSTATION14
+        Name         : PKTools
+        IsReset      : False
+        Path         : C:\Users\jbloggs\scripts\PKTools\PKTools.psd1
+        Type         : Script
+        OldVersion   : 1.6.1
+        NewVersion   : -
+        Messages     : Module 'PKTools' removal/re-import cancelled by user
+
+.EXAMPLE
+    PS C:\> $Arr | Reset-PKPSModule | FT -AutoSize
+
+        Action: Remove/import module(s)
+        WARNING: Module Sandbox is not currently loaded
+        WARNING: Loaded version of module 'PKActiveDirectory' is identical to available version 2.7.0
+        WARNING: Loaded version of module 'PKVMwareScripts' is identical to available version 3.13.0
+        Module 'PKVMwareScripts' removal/re-import cancelled by user
+        WARNING: Loaded version of module 'PKTools' is 1.7.0; available version is 1.6.2
+        WARNING: Module 'foo' is not currently loaded
+        ERROR: Module 'foo' not found in any module directory in path
+
+        ComputerName  Name               IsReset Path                                                           Type   OldVersion NewVersion Messages                                              
+        ------------  ----               ------- ----                                                           ----   ---------- ---------- --------                                              
+        WORKSTATION19 Sandbox               True C:\Users\jbloggs\scripts\Sandbox\Sandbox.psm1                  Script -          1.0.0      Module removed/imported successfully                  
+        WORKSTATION19 PKActiveDirectory     True C:\Users\jbloggs\corp\PKActiveDirectory\PKActiveDirectory.psm1 Script 2.7.0      2.7.0      Module removed/imported successfully                  
+        WORKSTATION19 PKVMwareScripts       True C:\Users\jbloggs\corp\PKVmwareScripts\PKVmwareScripts.psm1     Script 3.13.0     -          Module 'PKVMwareScripts' removal/re-import cancelled by user
+        WORKSTATION19 PKTools               True C:\Users\jbloggs\scripts\PKTools\PKTools.psm1                  Script 1.6.2      1.7.0      Module removed/imported successfully                  
+        WORKSTATION19 foo                  Error Error                                                          Error  Error      Error      Module 'foo' not found in any module directory in path
     
 #>
 
@@ -81,19 +103,21 @@ Param(
         HelpMessage = "Name of module, or module object"
     )]
     [alias("Name")]
-    [object[]]$Module
+    [object[]]$Module,
+
+    [Parameter(
+        Mandatory = $False,
+        HelpMessage = "Suppress all non-verbose, non-error console output"
+    )]
+    [switch]$SuppressConsoleOutput
 )
 Begin {
     
     # Current version (please keep up to date from comment block)
     [version]$Version = "01.01.0000"
 
-    # Generalpurpose splat
-    $StdParams = @{}
-    $StdParams = @{
-        ErrorAction = "Stop"
-        Verbose     = $False
-    }
+    #Pipeline
+    $PipelineInput = (-not $PSBoundParameters.ContainsKey("Module")) -and (-not $Module)
 
     # Show our settings
     $CurrentParams = $PSBoundParameters
@@ -107,138 +131,238 @@ Begin {
 
 
     $ErrorActionPreference = "Stop"
+
+    #region splats
+
+    # General-purpse splat
     $StdParams = @{
         Verbose = $False
         ErrorAction = "Stop"
     }
 
-    $OutputTemplate = New-Object PSObject -Property ([ordered]@{
-        Module     = $M
-        Path       = "Error"
-        Type       = "Error"
-        OldVersion = "Error"
-        NewVersion = "Error"
-        Messages   = "Error"
-    })
+    # Splat for Write-Progress
+    $Activity = "Remove/import module(s)"
+    $Param_WP1 = @{}
+    $Param_WP1 = @{
+        Activity         = $Activity
+        CurrentOperation = $Null
+        Status           = "Working"
+        PercentComplete  = $Null
+    }
+    $Param_WP2 = @{}
+    $Param_WP2 = @{
+        Activity         = $Activity
+        CurrentOperation = $Null
+        Status           = "Working"
+        PercentComplete  = $Null
+    }
 
+
+    #endregion Splats
+
+    # Output obuect
+    $InitialValue = "Error"
+    $OutputTemplate = New-Object PSObject -Property ([ordered]@{
+        ComputerName = $env:COMPUTERNAME
+        Name         = $InitialValue
+        IsReset      = $InitialValue        
+        Path         = $InitialValue
+        Type         = $InitialValue
+        OldVersion   = $InitialValue
+        NewVersion   = $InitialValue
+        Messages     = $InitialValue
+    })
     $Results = @()
 
-    $Activity = "Remove/import module(s)"
-    $Msg = $Activity
-    Write-Verbose $Msg
+    # Console output
+    $BGColor = $host.UI.RawUI.BackgroundColor
+    $Msg = "Action: $Activity"
+    $FGColor = "Yellow"
+    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
+    Else {Write-Verbose $Msg}
 
 }
 Process {
     
-    Foreach ($M in $Module) {
-       
-       $Output = $OutputTemplate.PSObject.Copy()
-       $Output.Module = $M
+    $Total1 = $Module.Count
+    $Current1 = 0
 
+    # Go through list of module s
+    Foreach ($M in $Module) {
+        
+        # create outer object
+        $Output1 = $OutputTemplate.PSObject.Copy()
+       
+        If ($M -is [psmoduleinfo]) {
+            $Output1.Name = $M.Name
+            $Msg = "Module object: $($M.Name)"
+        }
+        Else {
+            $Output1.Name = $M
+            $Msg = "Module name: $($M)"
+        }
+
+       Write-Verbose $Msg
+
+       $Current1 ++
+       $Param_WP1.Status = "$($Output1.Module)"
+       $Param_WP1.PercentComplete = ($Current1/$Total1*100)
+       
+       [switch]$Continue = $False
+
+       # Make sure it's a valid module object and see if it's currently loaded
         Try {
-            
-            [switch]$IsLoaded = $True
-            If (-not ($ModuleObj = Get-Module $M @StdParams)) {
+            $Msg = "Get module object"
+            $Param_WP1.CurrentOperation = $Msg
+            Write-Progress $Param_WP1
+
+            [Switch]$IsLoaded = $False
+            If (-not ([array]$ModuleObj = (Get-Module $M @StdParams | Add-Member -MemberType NoteProperty -Name "IsLoaded" -Value $True -PassThru -Force | Select -Property *))) {
 
                 $Msg = "Module '$M' is not currently loaded"
                 Write-Warning $Msg
-                [switch]$IsLoaded = $False
 
-                If (-not ($ModuleObj = Get-Module $M -ListAvailable @StdParams)) {
-                    $Msg = "Module '$M' not found in any module directory in path"
+                If (-not ([array]$ModuleObj = Get-Module $M -ListAvailable @StdParams | Add-Member -MemberType NoteProperty -Name "IsLoaded" -Value $False -PassThru -Force | Select -Property *)) {
+                    $Msg = "Module '$($Output1.Name)' not found in any module directory in path"
                     $Host.UI.WriteErrorLine("ERROR: $Msg")
-                    Return
+                    $Output1.Messages = $Msg
+                    $Results += $Output1
+                }
+                Else {
+                    $Continue = $True
                 }
             }
-
-            If ($ModuleObj) {
-                $Total = (($ModuleObj -as [array]).Count)
-                $Current = 0
-
-                Foreach ($Obj in $ModuleObj) {
-                
-                    $Current ++
-                    Write-Verbose $Obj
-                
-                    $Output = $OutputTemplate.PSObject.Copy()
-                    $AvailableVer = (Get-Module $Obj.Name -ListAvailable @StdParams).Version 
-
-                    If ($IsLoaded.IsPresent) {
-                        $Output.OldVersion = $Obj.Version
-                        If ($Obj.Version -eq $AvailableVer) {
-                            $Msg = "Loaded version of module '$($Obj.Name)' is identical to available version $AvailableVer"
-                            Write-Warning $Msg
-                        }
-                        If (($Obj.Version -gt $AvailableVer) -or ($Obj.Version -lt $AvailableVer)) {
-                            $Msg = "Loaded version of module '$($Obj.Name)' is $($Obj.Version); available version is $AvailableVer"
-                            Write-Verbose $Msg
-                        }
-                    }
-                    Else {$Output.OldVersion = "n/a"}
-
-                    $Output.Module     = $Obj.Name
-                    $Output.Path       = $Obj.Path
-                    $Output.Type       = $Obj.ModuleType
-                    $Output.NewVersion = "Error"
-                    $Output.Messages   = "Error"
-                
-                    Write-Progress -Activity $Activity -CurrentOperation $Obj.Name -PercentComplete ($Current / $Total * 100)
-
-                    If ($IsLoaded.IsPresent) {
-                        [switch]$Continue = $False
-                        $Msg = "Remove module"
-                        If ($PSCmdlet.ShouldProcess($($Obj.Name),$Msg)) {
-                            Try {
-                                $Null = $Obj | Remove-Module -Force -Confirm:$False @StdParams
-                                $Continue = $True
-                            }
-                            Catch {
-                                $Msg = "Module $($Obj.Name)' removal failed"
-                                $ErrorDetails = $_.Exception.Message
-                                $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
-                                $Output.Messages = $ErrorDetails
-                                [switch]$Continue = $False
-                            }
-                        }
-                        Else {
-                            $Msg = "Module '$($Obj.Name)' reset cancelled by user"
-                            Write-Warning $Msg
-                            $Output.Messages = $Msg
-                            [switch]$Continue = $False
-                        }
-                    }
-                    Else {$Continue = $True}
-                    
-                    If ($Continue.IsPresent) {
-                        $Msg = "Import module"
-                        If ($PSCmdlet.ShouldProcess($Obj.Name,$Msg)) {
-                            $Import = Get-Module $Obj.Name -ListAvailable @StdParams | Import-Module -PassThru -Force -Global @StdParams
-                            $Output.NewVersion = $Import.Version
-                            $Output.Messages = $Null
-                        }
-                        Else {
-                            $Msg = "Import of module '$($Obj.Name)' cancelled by user"
-                            Write-Verbose $Msg
-                            $Output.NewVersion = $Null
-                            $Output.Messages = $Msg
-                        }
-                    }
-
-                    $Results += $Output 
-                } #end for each module found
-            } # end if module
+            Else {
+                $Continue = $True
+                $IsLoaded = $True
+            }
         }
         Catch {
-            $Msg = "Module lookup failed for '$M'"
-            $ErrorDetails = $_.Exception.Message
-            $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
-            $Output.Messages = $ErrorDetails
-
-            $Results += $Output        
+            $Msg = "Module search failed for $($Output.Name)"
+            $Host.UI.WriteErrorLine("ERROR: $Msg for $M")
+            $Output1.Messages = $Msg
+            $Results += $Output1
         }
         
         
-    } # end for each module
+        # If we got the object    
+        If ($Continue.IsPresent) {
+            
+            $Continue = $False
+
+            $Total2 = $ModuleObj.Count
+            $Current2 = 0
+
+            Foreach ($Obj in $ModuleObj) {
+            
+                $Current2 ++
+                $Param_WP2.Status = $Obj.Name
+                $Param_WP2.PercentComplete = ($Current2/$Total2*100)
+                
+                $Msg = "Look for available version"
+                $Param_WP2.CurrentOperation = $Msg
+                Write-Progress @Param_WP2
+
+                # create inner object
+                $Output2 = $OutputTemplate.PSObject.Copy()
+                $Output2.Name = $Obj.Name
+                $Output2.Path = $Obj.Path
+                $Output2.Type = $Obj.ModuleType
+
+                $AvailableVer = (Get-Module $Obj.Name -ListAvailable @StdParams).Version 
+
+                # If it's loaded, check the available version against the current one, and prompt to remove current
+                If ($Obj.IsLoaded -eq $True) {
+                    
+                    $Output2.OldVersion = $Obj.Version
+
+                    If ($Obj.Version -eq $AvailableVer) {
+                        $Msg = "Loaded version of module '$($Obj.Name)' is identical to available version $AvailableVer"
+                        Write-Warning $Msg
+                    }
+                    Else {
+                        $Msg = "Loaded version of module '$($Obj.Name)' is $($Obj.Version); available version is $AvailableVer"
+                        Write-Warning $Msg
+                    }
+
+                    [switch]$Continue = $False
+                    $Msg = "Remove module"
+                    $Param_WP2.CurrentOperation = $Msg
+                    Write-Progress @Param_WP2
+
+                    If ($PSCmdlet.ShouldProcess($($Obj.Name),$Msg)) {
+                        Try {
+                            $Null = $Obj | Remove-Module -Force -Confirm:$False @StdParams
+                            $Continue = $True
+                        }
+                        Catch {
+                            $Msg = "Module removal failed for $($Obj.Name)"
+                            If ($ErrorDetails = $_.Exception.Message) {$Msg = "$Msg`n$ErrorDetails"}
+                            $Host.UI.WriteErrorLine("ERROR: $Msg")
+                            $Output2.IsReset = $False
+                            $Output2.Messages = $ErrorDetails
+                        }
+                    }
+                    Else {
+                        $Msg = "Module '$($Obj.Name)' removal/re-import cancelled by user"
+                        $Host.UI.WriteErrorLine($Msg)
+                        $Output2.NewVersion = "-"
+                        $Output2.Messages = $Msg
+                        $Output2.IsReset = $False
+                    }
+                
+                } #end if it was loaded
+                Else {
+                    $Output2.OldVersion = "-"
+                    $Continue = $True
+                }
+
+                # Import module
+                If ($Continue.IsPresent) {
+                    $Msg = "Import module"
+                    $Param_WP2.CurrentOperation = $Msg
+                    Write-Progress @Param_WP2
+
+                    If ($PSCmdlet.ShouldProcess($Obj.Name,$Msg)) {
+                        Try {
+                        $Import = Get-Module $Obj.Name -ListAvailable @StdParams | Import-Module -PassThru -Force -Global @StdParams
+                        
+                        If ($Obj.IsLoaded -eq $True) {
+                            $Msg = "Module removed/imported successfully"
+                        }
+                        Else {
+                            $Msg = "Module imported successfully"
+                        }
+                        Write-Verbose $Msg
+                        $Output2.IsReset = $True
+                        $Output2.NewVersion = $Import.Version
+                        $Output2.Messages = $Msg
+                        }
+                        Catch {
+                            $Msg = "Module import failed for $($Obj.Name)"
+                            If ($ErrorDetails = $_.Exception.Message) {$Msg = "$Msg`n$ErrorDetails"}
+                            $Host.UI.WriteErrorLine("ERROR: $Msg")
+                            $Output2.Messages = $ErrorDetails
+                            $Output2.IsReset = $False
+                        }
+                    }
+                    Else {
+                        $Msg = "Import of module '$($Obj.Name)' cancelled by user"
+                        $Host.UI.WriteErrorLine($Msg)
+                        $Output2.IsReset = $False
+                        $Output2.NewVersion = "-"
+                        $Output2.Messages = $Msg
+                    }
+                }
+
+                # Add them up
+                $Results += $Output2
+            } #end for each found module object
+
+        } #end for each valid module object
+    
+    } #end fo each input
+        
     
 }
 End {

@@ -11,15 +11,16 @@ Function Get-PKADComputerMiniReport {
     Returns a PSobject
 
 .NOTES        
-    Name    : Function_Test-PKConnection.ps1
-    Author  : Paula Kingsley
+    Name    : Function_Get-PKADComputerMiniReport.ps1
     Created : 2017-11-20
-    Version : 01.00.0000
+    Author  : Paula Kingsley
+    Version : 01.01.0000
     History:
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
         
         v01.00.0000 - 2017-11-20 - Created script based on jrich's original
+        v01.01.0000 - 2017-11-21 - Added internal function for DNS lookup to prevent terminating errors on failure
         
 .LINK
     https://gallery.technet.microsoft.com/scriptcenter/Powershell-Test-Server-e0cdea9a?ranMID=24542&ranEAID=je6NUbpObpQ&ranSiteID=je6NUbpObpQ-1p7VW5KEESFnLgSaMed_Bw&tduid=(05cc9a118b47a445311a4d27bb47d63a)(256380)(2459594)(je6NUbpObpQ-1p7VW5KEESFnLgSaMed_Bw)()
@@ -304,7 +305,7 @@ Param(
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01.0000"
 
     # How did we get here
     $PipelineInput = (-not $PSBoundParameters.ContainsKey("VM")) -and (-not $VM)
@@ -367,6 +368,16 @@ Begin {
     #endregion Splats
 
     #region Functions
+
+    # DNS lookup (trap/hide errors)
+    Function Get-DNS{
+        [Cmdletbinding()]
+        Param($Name)
+        Try {
+            [Net.Dns]::GetHostEntry($Name)
+        }
+        Catch {}
+    }
 
     # Convert useraccountcontrol
     Function Get-ComputerState {
@@ -540,9 +551,14 @@ Process {
 
                     # DNS lookup
                     $DNSEntity = $Null
-                    $DNSEntity = [Net.Dns]::GetHostEntry($NameStr)
-                    [string[]]$Output.IPAddress = $DNSEntity.AddressList | Foreach-Object {$_.IPAddressToString}
-
+                    If ($DNSEntity = Get-DNS -Name $NameStr) {[string[]]$Output.IPAddress = $DNSEntity.AddressList | Foreach-Object {$_.IPAddressToString}}
+                    Else {
+                        $Msg = "DNS lookup failed for $NameStr"
+                        If ($TestConnection.IsPresent) {$Msg = "$Msg; connection test will be skipped"}
+                        $Host.UI.WriteErrorLine("ERROR: $Msg")
+                        [string[]]$Output.IPAddress = "(none)"
+                    }
+                    
                     # Convert last logon date
                     If (-not ($Output.LastLogon = [datetime]::FromFileTime($($Obj.Properties.lastlogontimestamp)))) {$Output.LastLogon = "(unknown)"}
                     
@@ -577,19 +593,20 @@ Process {
 
                     # Ping it if object is enabled
                     If ($TestConnection.IsPresent) {
-
-                        If ($Output.IsEnabled -eq $True) {
-                            $Msg = "Ping computer"
-                            $Param_WP.CurrentOperation = $Msg
-                            Write-Progress @Param_WP
+                        If ($DNSEntity) { 
+                            If ($Output.IsEnabled -eq $True) {
+                                $Msg = "Ping computer"
+                                $Param_WP.CurrentOperation = $Msg
+                                Write-Progress @Param_WP
                         
-                            If ($DNSEntity -eq "(unavailable)") {$Output.IsAlive = "(unavailable)"}
-                            Else {$Output.IsAlive = Test-Ping -ComputerName $FQDN}
-                        }
-                        Else {
-                            $Msg = "Connection testing unavailable for disabled computer $NameStr"
-                            $Host.UI.WriteErrorLine($Msg)
-                            $Output.IsAlive = $False
+                                If ($DNSEntity -eq "(unavailable)") {$Output.IsAlive = "(unavailable)"}
+                                Else {$Output.IsAlive = Test-Ping -ComputerName $FQDN}
+                            }
+                            Else {
+                                $Msg = "Connection testing unavailable for disabled computer $NameStr"
+                                $Host.UI.WriteErrorLine($Msg)
+                                $Output.IsAlive = $False
+                            }
                         }
                     }
                     
