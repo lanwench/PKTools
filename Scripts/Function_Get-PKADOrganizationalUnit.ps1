@@ -1,13 +1,12 @@
 ﻿#requires -Version 3
 Function Get-PKADOrganizationalUnit {
 <#
-SYNOPSIS
-    Uses the ADSI type accelerator to return a menu of Organizational Units in an external gridview
+.SYNOPSIS
+    Uses the ADSI type accelerator to return a menu of Organizational Units in an external gridview (no ActiveDirectory module required)
 
 .DESCRIPTION
-    Uses the ADSI type accelerator to return a menu of Organizational Units in an external gridview
+    Uses the ADSI type accelerator to return a menu of Organizational Units in an external gridview (no ActiveDirectory module required)
     Defaults searchbase to distinguishedname of current computer's domain 
-    ActiveDirectory module not required
     Allows for a regular expression match for include/exclude
     Accepts pipeline input
     Returns a PSObject
@@ -115,8 +114,6 @@ SYNOPSIS
         domain.local/Production/Computers/VMs/SQL      OU=SQL,OU=VMs,OU=Computers,OU=Production,DC=domain,DC=local   SQL    
         domain.local/Production/Computers/Laptops      OU=Laptops,OU=Computers,OU=Production,DC=domain,DC=local      Laptops 
         domain.local/Development/Migration/Computers   OU=Computers,OU=Migration,OU=Development,DC=domain,DC=local   Computers
-
-
 
 #>
 [CmdletBinding()]

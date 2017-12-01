@@ -1,13 +1,14 @@
 ﻿#requires -Version 3
 Function Get-PKADComputerMiniReport {
 <#
-SYNOPSIS
-    Returns AD computer object AD details 
+.SYNOPSIS
+    Uses the ADSI type accelerator to return AD computer object AD details (no ActiveDirectory module required)
 
 .DESCRIPTION
-    Reports Windows disk information using Invoke-Command as a job, with option to wait for output
+    Uses the ADSI type accelerator to return AD computer object AD details (no ActiveDirectory module required)
+    Optional switches look up the AD site name and ping the computer 
     Accepts pipeline input
-    Returns a PSobject or PSJob
+    Returns a PSobject
 
 .NOTES        
     Name    : Function_Test-PKConnection.ps1
@@ -26,8 +27,17 @@ SYNOPSIS
 .PARAMETER ComputerName
     Name of computer to check; separate multiple names with commas
 
-.PARAMETER CredSSP
-    Include CredSSP test (requires credential)
+.PARAMETER SizeLimit
+    Maximum number of objects to return per search string (default is 100)
+
+.PARAMETER DomainDN
+    LDAP path to AD domain distinguishedname (default is local computer domain)
+
+.PARAMETER GetADSite
+    Look up the AD site for the computer if it's enabled (will slow processing)
+
+.PARAMETER TestConnection
+    Ping the computer if it's enabled (will slow processing)
 
 .PARAMETER Credential
     Valid credential on target

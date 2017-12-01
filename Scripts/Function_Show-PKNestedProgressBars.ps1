@@ -1,7 +1,7 @@
 ﻿#requires -Version 3
 Function Show-PKNestedProgressBars {
 <#
-SYNOPSIS
+.SYNOPSIS
     Demonstrates four nested progress bars displaying the hour, minute, second, and millisecond in a countdown to midnight
 
 .DESCRIPTION

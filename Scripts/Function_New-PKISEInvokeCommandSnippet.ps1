@@ -2,22 +2,26 @@
 Function New-PKISEInvokeCommandSnippet {
 <#
 .SYNOPSIS
-    Adds a new PS ISE snippet containing a template function to run Invoke-Command on one or more remote computers (optionally as a job)
-    
+    Adds a new PS ISE snippet containing a template function (function runs Invoke-Command on one or more remote computers interactively or as a job)
+
 .DESCRIPTION
-    Adds a new PS ISE snippet containing a template function to run Invoke-Command on one or more remote computers (optionally as a job)
+    Adds a new PS ISE snippet containing a template function (function runs Invoke-Command on one or more remote computers interactively or as a job)
+    SupportsShouldProcess
     Returns a string
-    
+
 .NOTES
     Name    : Function_New-PKISEInvokeCommandSnippet.ps1
-    Version : 01.00.0000
-    Author  : Paula Kingsley
     Created : 2017-11-28
+    Author  : Paula Kingsley
+    Version : 01.00.0000
     History :
 
         ** PLEASE KEEP $VERSION UPDATED IN BEGIN BLOCK **
 
         v01.00.0000 - 2017-11-28 - Created script
+
+.PARAMETER Force
+    Forces creation even if snippet name exists
 
 .EXAMPLE
     PS C:\> New-PKISEInvokeCommandSnippet -Verbose
@@ -64,7 +68,7 @@ Function New-PKISEInvokeCommandSnippet {
         Mode                LastWriteTime         Length Name                                                                           
         ----                -------------         ------ ----                                                                           
         -a----       2017-11-28     12:10          12156 Function to run Invoke-Command.snippets.ps1xml     
-.EXAMLE
+.EXAMPLE
     PS C:\> New-PKISEInvokeCommandSnippet -Force -Verbose
 
         VERBOSE: PSBoundParameters: 
@@ -84,15 +88,18 @@ Function New-PKISEInvokeCommandSnippet {
 
         Mode                LastWriteTime         Length Name                                                                           
         ----                -------------         ------ ----                                                                           
-        -a----       2017-11-28     12:10          12156 Function to run Invoke-Command.snippets.ps1xml  
+        -a----       2017-11-28     12:10          12156 Function to run Invoke-Command.snippets.ps1xml 
 
-        
 #>
 [Cmdletbinding(
     SupportsShouldProcess = $True,
     ConfirmImpact = "High"
 )]
 Param(
+    [Parameter(
+        Mandatory = $False,
+        HelpMessage = "Force creation of snippet even if name already exists"
+    )]
     [switch]$Force
 )
 Begin {

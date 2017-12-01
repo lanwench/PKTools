@@ -1,17 +1,20 @@
-﻿Function Test-PKConnection {
+﻿#requires -Version 3
+Function Test-PKConnection {
 <#
-SYNOPSIS
-    Reports Windows disk information using Invoke-Command as a job, with option to wait for output
+.SYNOPSIS
+    Performs various connectivity tests to remote computers
 
 .DESCRIPTION
-    Reports Windows disk information using Invoke-Command as a job, with option to wait for output
+    Performs various connectivity tests to remote computers
+    Looks up name in DNS, and defaults to testing: Ping, RDP, Registry, SSH, WinRM and WMI
+    Optionally, Tests brings up menu for selection, including CredSSP
     Accepts pipeline input
-    Returns a PSobject or PSJob
+    Returns a PSobject
 
 .NOTES        
     Name    : Function_Test-PKConnection.ps1
-    Author  : Paula Kingsley
     Created : 2017-11-20
+    Author  : Paula Kingsley
     Version : 01.00.0000
     History:
 
