@@ -12,7 +12,7 @@
 RootModule = 'PKTools.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.05.0001'
+ModuleVersion = '1.06.0000'
 
 # ID used to uniquely identify this module
 GUID = '3a49eaff-5e0f-41db-b149-3dc1f36968c1'
@@ -27,7 +27,7 @@ CompanyName = 'Amalgamated Toothpick, Inc'
 Copyright = '(c) 2017 Paula Kingsley. All rights reserved.'
 
 # Description of the functionality provided by this module
-# Description = ''
+Description = 'Various PowerShell tools, functions, demos'
 
 # Minimum version of the Windows PowerShell engine required by this module
  PowerShellVersion = '3.0.0'
