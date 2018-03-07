@@ -18,7 +18,7 @@ Function Install-PKWindowsPythonPackage {
     Version : 01.00.0000
     Author  : Paula Kingsley
     History:
-        
+
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK
 
         v01.00.0000 - 2017-12-01 - Created script
@@ -50,22 +50,22 @@ Function Install-PKWindowsPythonPackage {
 .EXAMPLE
     PS C:\> Install-PKWindowsPIPPackage -ComputerName localhost -Package fuzzywuzzy,elasticsearch -Force -Verbose
 
-        VERBOSE: PSBoundParameters: 
-	
-        Key                   Value                                    
-        ---                   -----                                    
-        ComputerName          {localhost}                              
-        Package               {fuzzywuzzy, elasticsearch}              
-        Force                 True                                     
-        Verbose               True                                     
-        Upgrade               False                                    
-        AsJob                 False                                    
+        VERBOSE: PSBoundParameters:
+
+        Key                   Value
+        ---                   -----
+        ComputerName          {localhost}
+        Package               {fuzzywuzzy, elasticsearch}
+        Force                 True
+        Verbose               True
+        Upgrade               False
+        AsJob                 False
         Credential            System.Management.Automation.PSCredential
-        SkipConnectionTest    False                                    
-        SuppressConsoleOutput False                                    
-        PipelineInput         False                                    
-        ScriptName            Install-PKWindowsPIPPackage                  
-        ScriptVersion         1.0.0                                    
+        SkipConnectionTest    False
+        SuppressConsoleOutput False
+        PipelineInput         False
+        ScriptName            Install-PKWindowsPIPPackage
+        ScriptVersion         1.0.0
 
         Action: Test connection and install pip packages 'fuzzywuzzy', 'elasticsearch' (force)
         VERBOSE: localhost
@@ -86,33 +86,33 @@ Function Install-PKWindowsPythonPackage {
         Upgrade      : False
         pipVersion   : pip 9.0.1 from c:\python36\lib\site-packages (python 3.6)
         Messages     : Successfully installed elasticsearch-6.0.0 urllib3-1.22
-        
+
 .EXAMPLE
     PS C:\> $Computers | Install-PKWindowsPIPPackage -Package fuzzywuzzy -Verbose
 
-        VERBOSE: PSBoundParameters: 
-	
-        Key                   Value                                    
-        ---                   -----                                    
-        Package               fuzzywuzzy                               
-        Verbose               True                                     
-        ComputerName                                                   
-        Upgrade               False                                    
-        Force                 False                                    
-        AsJob                 False                                    
+        VERBOSE: PSBoundParameters:
+
+        Key                   Value
+        ---                   -----
+        Package               fuzzywuzzy
+        Verbose               True
+        ComputerName
+        Upgrade               False
+        Force                 False
+        AsJob                 False
         Credential            System.Management.Automation.PSCredential
-        SkipConnectionTest    False                                    
-        SuppressConsoleOutput False                                    
-        PipelineInput         True                                     
-        ScriptName            Install-PKWindowsPIPPackage                  
-        ScriptVersion         1.0.0                                    
+        SkipConnectionTest    False
+        SuppressConsoleOutput False
+        PipelineInput         True
+        ScriptName            Install-PKWindowsPIPPackage
+        ScriptVersion         1.0.0
 
         Action: Test connection and install pip package 'fuzzywuzzy'
         VERBOSE: sqlserver.domain.local
         VERBOSE: webserver.domain.local
         VERBOSE: foo.domain.local
-        ERROR: Connection failure on foo.domain.local [The WinRM client cannot process the request.  
-        Default credentials with Negotiate over HTTP can be used only if the target machine is part of 
+        ERROR: Connection failure on foo.domain.local [The WinRM client cannot process the request.
+        Default credentials with Negotiate over HTTP can be used only if the target machine is part of
         the TrustedHosts list or the Allow implicit credentials for Negotiate option is specified.]
         VERBOSE: exchangeserver.domain.local
         Operation cancelled by user on exchangeserver.domain.local
@@ -124,7 +124,7 @@ Function Install-PKWindowsPythonPackage {
         Upgrade        : False
         pipVersion     : pip 9.0.1 from C:\Python27\lib\site-packages (python 2.7)
         Messages       : Package 'fuzzywuzzy (0.15.1)' already installed; please specify -Force or -Upgrade
-        
+
         ComputerName   : WEBSERVER
         Package        : fuzzywuzzy
         IsInstalled    : True
@@ -136,31 +136,31 @@ Function Install-PKWindowsPythonPackage {
 .EXAMPLE
     PS C:\> $ Install-PKWindowsPIPPackage -ComputerName devbox -Package treetime -Force -Credential $Credential -SkipConnectionTest -AsJob -Verbose
 
-        VERBOSE: PSBoundParameters: 
-	
-        Key                   Value                                    
-        ---                   -----                                    
-        ComputerName          {devbox}   
-        Package               treetime                                 
-        Force                 True                                     
+        VERBOSE: PSBoundParameters:
+
+        Key                   Value
+        ---                   -----
+        ComputerName          {devbox}
+        Package               treetime
+        Force                 True
         Credential            System.Management.Automation.PSCredential
-        SkipConnectionTest    True                                     
-        AsJob                 True                                     
-        Verbose               True                                     
-        Upgrade               False                                    
-        SuppressConsoleOutput False                                    
-        PipelineInput         False                                    
-        ScriptName            Install-PKWindowsPIPPackage                  
-        ScriptVersion         1.0.0                                    
+        SkipConnectionTest    True
+        AsJob                 True
+        Verbose               True
+        Upgrade               False
+        SuppressConsoleOutput False
+        PipelineInput         False
+        ScriptName            Install-PKWindowsPIPPackage
+        ScriptVersion         1.0.0
 
         Action: Install pip package 'treetime' (force) as PSJob
         VERBOSE: devbox
         VERBOSE: Created job 33
         VERBOSE: 1 job(s) submitted; run 'Get-Job x | Wait-Job | Receive-Job'
 
-        Id     Name        PSJobTypeName   State         HasMoreData     Location       Command                  
-        --     ----        -------------   -----         -----------     --------       -------                  
-        33     pip_devb... RemoteJob       Running       True            devbox.int...  ...                      
+        Id     Name        PSJobTypeName   State         HasMoreData     Location       Command
+        --     ----        -------------   -----         -----------     --------       -------
+        33     pip_devb... RemoteJob       Running       True            devbox.int...  ...
 
         [...]
 
@@ -174,7 +174,7 @@ Function Install-PKWindowsPythonPackage {
         pipVersion     : Error
         Messages       : pip.exe not found
                          Chocolatey detected; you can install pip via 'choco install pip -y''
-        
+
 .EXAMPLE
     PS C:\> Install-PKWindowsPIPPackage -ComputerName testvm -Package boguspackage -SuppressConsoleOutput
 
@@ -217,19 +217,19 @@ Param(
         Mandatory = $false,
         HelpMessage = "Upgrade installation"
     )]
-    [Switch] $Upgrade,  
+    [Switch] $Upgrade,
 
     [Parameter(
         Mandatory = $false,
         HelpMessage = "Force installation"
     )]
-    [Switch] $Force,  
-    
+    [Switch] $Force,
+
     [Parameter(
         Mandatory = $false,
         HelpMessage = "Run as PSJob"
     )]
-    [Switch] $AsJob,  
+    [Switch] $AsJob,
 
     [Parameter(
         Mandatory = $False,
@@ -242,8 +242,8 @@ Param(
         Mandatory = $false,
         HelpMessage = "Don't test WinRM connection before submitting command"
     )]
-    [Switch] $SkipConnectionTest,        
-    
+    [Switch] $SkipConnectionTest,
+
     [Parameter(
         Mandatory = $false,
         HelpMessage = "Suppress non-verbose console output"
@@ -262,7 +262,7 @@ Begin {
 
     # Show our settings
     $CurrentParams = $PSBoundParameters
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
+    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} |
         Where {Test-Path variable:$_}| Foreach {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
@@ -286,7 +286,7 @@ Begin {
 
     # Create scriptblock
     $Scriptblock = {
-    
+
         Param($Package,$Force,$Upgrade)
         $Package = $Using:Package
         [switch]$Force = $Using:Force
@@ -312,7 +312,7 @@ Begin {
             Messages      = $InitialValue
         }
         $Select = "ComputerName","Package","IsInstalled","Force","Upgrade","pipVersion","PythonVersion","Messages"
-        
+
         [switch]$Continue = $False
 
         # Check for Python
@@ -329,7 +329,7 @@ Begin {
             Else {
                 $OutputTemplate.PythonVersion = $Python.Version
                 $OutputTemplate.PythonPath = $Python.Source
-                
+
                 If ($Python.Count -gt 1) {
                     $Msg = "Multiple versions of Python found; please adjust system path & `$env:PythonHome to the value you wish"
                     $OutputTemplate.IsInstalled = $False
@@ -377,9 +377,9 @@ Begin {
 
         # If pip found, look for the packages and current installation state for each
         If ($Continue.IsPresent) {
-            
+
             Foreach ($Pkg in $Package) {
-                
+
                 $continue = $False
 
                 $Pkg = $Pkg.Trim()
@@ -397,14 +397,14 @@ Begin {
                             $Continue = $True
                         }
                         Elseif ($Upgrade.IsPresent) {
-                            $Expression = "$Expression  --force-reinstall"   
+                            $Expression = "$Expression  --force-reinstall"
                             $Continue = $True
                         }
                         Else {
                             $Msg = "Package '$Exists' already installed; please specify -Force or -Upgrade"
                             $Output.IsInstalled = $False
                             $Output.Messages = $Msg
-                            $Results += $Output   
+                            $Results += $Output
                         }
                     }
                     Else {
@@ -420,14 +420,14 @@ Begin {
                     $Output.Messages = $Msg
                     $Results += $Output
                 }
-            
+
                 # If package isn't installed, or we are forcing install anyway
                 If ($Continue.IsPresent) {
-            
+
                     $Continue = $False
-                    
+
                     Try {
-                
+
                         $Expression = "$Expression -v 2>&1"
                         $Null = Invoke-Expression -Command $Expression -OutVariable Install -ErrorAction SilentlyContinue
 
@@ -454,16 +454,16 @@ Begin {
                         $Output.IsInstalled = $False
                         $Output.Messages = $Msg
                     }
-                    
+
                     $Results += $Output
-                
+
                 } #end if continue
 
             } #end for each package
-        
+
         } #end if pip found
 
-        Write-Output $Results  | Select $Select 
+        Write-Output $Results  | Select $Select
 
     } # end scriptblock
 
@@ -521,12 +521,12 @@ Begin {
         Verbose      = $False
     }
     If ($AsJob.IsPresent) {
-       $Activity += " as PSJob" 
-       $Param_IC.Add("AsJob",$True) 
-       $Param_IC.Add("JobName",$Null) 
+       $Activity += " as PSJob"
+       $Param_IC.Add("AsJob",$True)
+       $Param_IC.Add("JobName",$Null)
        $Jobs = @()
     }
-    
+
     #endregion Splats
 
     # Console output
@@ -544,25 +544,25 @@ Process {
     $Current = 0
 
     Foreach ($Computer in $ComputerName) {
-                
+
         $Current ++
 
         Write-Verbose $Computer
         $Param_WP.CurrentOperation = $Computer
         $Param_WP.PercentComplete = ($Current / $Total * 100)
-        Write-Progress @Param_WP 
-                
+        Write-Progress @Param_WP
+
         [Switch] $Continue = $True
         If ($PSCmdlet.ShouldProcess($Computer,$ConfirmMsg)) {
-            
+
             If (-not $SkipConnectionTest.IsPresent) {
-                
+
                 If ($Computer -eq $env:COMPUTERNAME) {
                     $Msg = "(Skipping connection test to local computer)"
                     Write-Verbose $Msg
                     $Continue = $True
                 }
-                Else {                        
+                Else {
                     Try {
                         $Param_WSMAN.ComputerName = $Computer
                         If ($Null = Test-WSMan @Param_WSMan ) {$Continue = $True}
@@ -576,9 +576,9 @@ Process {
                 }
             } #end if testing WinRM
             Else {$Continue = $True}
-            
+
             If ($Continue.IsPresent) {
-                
+
                 $Param_IC.ComputerName = $Computer
 
                 If ($AsJob.IsPresent) {
@@ -586,7 +586,7 @@ Process {
                     $Job =  Invoke-Command @Param_IC
                     $Jobs += $Job
                     $Msg = "Created job $($Job.ID)"
-                    Write-Verbose $Msg   
+                    Write-Verbose $Msg
                 }
                 Else {
                     $Results += Invoke-Command @Param_IC
@@ -601,7 +601,7 @@ Process {
 
 }
 End {
-    
+
     Write-Progress -Activity $Activity -Completed
 
     If ($AsJob.IsPresent) {
@@ -621,7 +621,7 @@ End {
         }
         Else {
             $Msg = "No results"
-            $Host.UI.WriteErrorLine($Msg) 
+            $Host.UI.WriteErrorLine($Msg)
         }
     }
 
@@ -629,6 +629,6 @@ End {
 } #end Install-PKWindowsPIPPackagePackage
 
 
-$Null = New-Alias -Name Install-PKWindowsPipPackage -Value Install-PKWindowsPythonPackage -Force -Description "Consistency and searchability"
-$Null = New-Alias -Name Install-PKWindowsPip -Value Install-PKWindowsPythonPackage -Force -Description "Consistency and searchability"
-$Null = New-Alias -Name Install-PKPipPackage -Value Install-PKWindowsPythonPackage -Force -Description "Consistency and searchability"
+$Null = New-Alias -Name Install-PKWindowsPipPackage -Value Install-PKWindowsPythonPackage -Force -Description "Consistency and searchability" -Confirm:$False
+$Null = New-Alias -Name Install-PKWindowsPip -Value Install-PKWindowsPythonPackage -Force -Description "Consistency and searchability" -Confirm:$False
+$Null = New-Alias -Name Install-PKPipPackage -Value Install-PKWindowsPythonPackage -Force -Description "Consistency and searchability" -Confirm:$False

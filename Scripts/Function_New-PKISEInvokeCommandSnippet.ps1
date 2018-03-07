@@ -13,12 +13,13 @@ Function New-PKISEInvokeCommandSnippet {
     Name    : Function_New-PKISEInvokeCommandSnippet.ps1
     Created : 2017-11-28
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01.0000
     History :
 
         ** PLEASE KEEP $VERSION UPDATED IN BEGIN BLOCK **
 
         v01.00.0000 - 2017-11-28 - Created script
+        v01.01.0000 = 2018-03-06 - Updated scriptblock/snippet
 
 .PARAMETER Force
     Forces creation even if snippet name exists
@@ -128,18 +129,22 @@ Begin {
         Verbose     = $False
     }
     
-    $Author = "Paula Kingsley"
-    $SnippetName = "Function to run Invoke-Command"
-    $Description = "New-InvokeCommandFunction"
-
-
     If (-not $PSISE) {
         $Msg = "This function requires the PowerShell ISE environtment"
         $Host.UI.WriteErrorLine($Msg)
         Break
     }
 
-# Here-string for function content    
+    #region Snippet info
+
+    $Author = "Paula Kingsley"
+    $SnippetName = "Function to run Invoke-Command"
+    $Description = "New-InvokeCommandFunction"
+
+    #endregion Snippet info
+
+    #region Here-string for function content    
+
 $Body = @'
 #Requires -version 3
 Function Do-SomethingCool {
@@ -154,14 +159,14 @@ Function Do-SomethingCool {
 
 .NOTES        
     Name    : Function_do-Somethingcool.ps1
-    Created : 2017-11-28
+    Created : 2018-03-05
     Author  : Paula Kingsley
-    Version : 02.00.0000
+    Version : 01.00.0000
     History :
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
         
-        v01.00.0000 - 2017-11-28 - Created script
+        v01.00.0000 - 2018-03-05 - Created script
 
 .PARAMETER ComputerName
     Name of computer to do cool thing on; separate multiple names with commas
@@ -172,14 +177,8 @@ Function Do-SomethingCool {
 .PARAMETER AsJob
     Do the cool thing as a job
 
-.PARAMETER WaitForJob
-    If running as a PSJob, wait for completion and return results
-
-.PARAMETER JobWaitTimeout
-    If WaitForJob, timeout in seconds for job output
-
-.PARAMETER SkipConnectionTest
-    Don't test WinRM connectivity before submitting command
+.PARAMETER ConnectionTest
+    Run WinRM or ping test prior to invoke-command, or no test (default is WinRM)
 
 .PARAMETER SuppressConsoleOutput
     Hide all non-verbose/non-error console output
@@ -216,31 +215,17 @@ Param (
     [pscredential] $Credential = [System.Management.Automation.PSCredential]::Empty,
 
     [Parameter(
-        ParameterSetName = "Job",
         Mandatory = $False,
-        HelpMessage = "Run as remote PSJob"
+        HelpMessage = "Run Invoke-Command scriptblock as PSJob"
     )]
     [Switch] $AsJob,
 
     [Parameter(
-        ParameterSetName = "Job",
         Mandatory=$False,
-        HelpMessage="Wait for job completion"
+        HelpMessage="Test to run prior to invoke-command - WinRM (default, using Kerberos), ping, or none)"
     )]
-    [Switch] $WaitForJob,
-
-    [Parameter(
-        ParameterSetName = "Job",
-        Mandatory=$False,
-        HelpMessage="Timeout in seconds to wait for job results (default 10)"
-    )]
-    [int] $JobWaitTimeout = 10,
-
-    [Parameter(
-        Mandatory=$False,
-        HelpMessage="Don't test WinRM connectivity before invoking command"
-    )]
-    [Switch] $SkipConnectionTest,
+    [ValidateSet("WinRM","Ping","None")]
+    [string] $ConnectionTest = "WinRM",
 
     [Parameter(
         Mandatory=$False,
@@ -250,13 +235,14 @@ Param (
 
 )
 
-
 Begin { 
     
     # Current version (please keep up to date from comment block)
     [version]$Version = "01.00.0000"
 
     # Show our settings
+    $Source = $PSCmdlet.ParameterSetName
+    [switch]$PipelineInput = (-not $PSBoundParameters.ContainsKey("ComputerName")) -and (-not $ComputerName)
     $CurrentParams = $PSBoundParameters
     $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
         Where {Test-Path variable:$_}| Foreach {
@@ -270,6 +256,66 @@ Begin {
     $ErrorActionPreference = "Stop"
     $ProgressPreference    = "Continue"
     
+    # Output
+    [array]$Results = @()
+    
+    #region Scriptblock for invoke-command
+
+    $ScriptBlock = {
+        
+        Param($Arguments)
+
+        $ErrorActionPreference = "Stop"
+        $InitialValue = "Error"
+        $Output = New-Object PSObject -Property @{
+            ComputerName = $Env:ComputerName
+            Messages     = $InitialValue
+        }
+        $Select = "ComputerName","Messages"
+        
+        Try {
+            # Impressive code here
+        }
+        Catch {
+            $Output.Messages = $_.Exception.Message
+            Write-Output ($Output | Select $Select)
+        }
+        
+        Write-Output ($Output | Select-Object $Select)
+
+    } #end scriptblock
+
+    #endregion Scriptblock for invoke-command
+
+    #region Functions
+
+    Function Test-WinRM{
+        Param($Computer)
+        $Param_WSMAN = @{
+            ComputerName   = $Computer
+            Credential     = $Credential
+            Authentication = "Kerberos"
+            ErrorAction    = "Silentlycontinue"
+            Verbose        = $False
+        }
+        Try {
+            If (Test-WSMan @Param_WSMAN) {$True}
+            Else {$False}
+        }
+        Catch {$False}
+    }
+
+    Function Test-Ping{
+        Param($Computer)
+        $Task = (New-Object System.Net.NetworkInformation.Ping).SendPingAsync($Computer)
+        If ($Task.Result.Status -eq "Success") {$True}
+        Else {$False}
+    }
+
+    #endregion Functions
+
+    #region Splats
+
     # General purpose splat
     $StdParams = @{}
     $StdParams = @{
@@ -277,46 +323,10 @@ Begin {
         Verbose     = $False
     }
 
-    $Results = @()
-    
-    # Scriptblock for invoke-command
-    $SCriptBlock = {
-        
-        Param($Arguments)
-
-        $ErrorActionPreference = "Stop"
-
-        $Results = @()
-        
-        $InitialValue = "Error"
-        $OutputTemplate = @{
-            ComputerName = $Env:ComputerName
-            Messages     = $InitialValue
-        }
-
-        $Select = "ComputerName","Messages"
-        
-        
-        Try {
-            
-            # Impressive code here
-        }
-        Catch {
-            $OutputTemplate.Messages = $_.Exception.Message
-            $Results += New-Object PSObject -property $OutputTemplate
-        }
-        
-        Write-Output ($Results | Select-Object $Select)
-
-    } #end scriptblock
-
-    #region Splats
-
     # Splat for Write-Progress
     $Activity = "Do a cool thing"
     If ($AsJob.IsPresent) {
         $Activity = "$Activity as remote PSJob"
-        If ($WaitForJob.IsPresent) {$Activity = "$Activity (wait $JobWaitTimeout second(s) for job output)"}
     }
     $Param_WP = @{}
     $Param_WP = @{
@@ -325,17 +335,6 @@ Begin {
         Status           = "Working"
         PercentComplete  = $Null
     }
-
-    # Parameters for Test-WSMan
-    $Param_WSMAN = @{}
-    $Param_WSMAN = @{
-        ComputerName   = ""
-        Credential     = $Credential
-        Authentication = "Kerberos"
-        ErrorAction    = "Silentlycontinue"
-        Verbose        = $False
-    }
-   
 
     # Parameters for Invoke-Command
     $ConfirmMsg = $Activity
@@ -359,9 +358,9 @@ Begin {
 
     # Console output
     $BGColor = $host.UI.RawUI.BackgroundColor
-    $Msg = "Action: $Activity"
+    $Msg = "[SCRIPT BEGIN] $Activity"
     $FGColor = "Yellow"
-    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
+    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"$Msg`n")}
     Else {Write-Verbose $Msg}
 
 
@@ -376,58 +375,76 @@ Process {
     Foreach ($Computer in $ComputerName) {
         
         $Computer = $Computer.Trim()
-        $Msg = $Computer
-        Write-Verbose $Msg
-
         $Current ++ 
 
         [int]$percentComplete = ($Current/$Total* 100)
-        $Param_WP.CurrentOperation = $Computer
         $Param_WP.PercentComplete = $PercentComplete
-        $Param_WP.Status = "$percentComplete%"
-        Write-Progress @Param_WP
+        $Param_WP.Status = $Computer
         
         [switch]$Continue = $False
 
-        # If we're testing WinRM
-        If (-not $SkipConnectionTest.IsPresent) {
-                    
-            $Msg = "Test WinRM connection"
-            Write-Verbose $Msg
+        Switch ($ConnectionTest) {
+            Default {$Continue = $True}
+            Ping {
+                If ($Computer -ne $env:COMPUTERNAME) {
+                    $Msg = "Ping computer"
+                    $Param_WP.CurrentOperation = $Msg
+                    Write-Verbose "[$Computer] $Msg"
+                    Write-Progress @Param_WP
 
-            If ($PSCmdlet.ShouldProcess($Computer,$Msg)) {
+                    If ($PSCmdlet.ShouldProcess($Computer,"`n$Msg`n")) {
+                        If ($Null = Test-Ping -Computer $Computer) {$Continue = $True}
+                        Else {
+                            $Msg = "Ping failure"
+                            $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                        }
+                    }
+                    Else {
+                        $Msg = "Ping connection test cancelled by user"
+                        $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                    }
+                }
+                Else {$Continue = $True}
+            }
+            WinRM {
+                If ($Computer -ne $env:COMPUTERNAME) {
+                    $Msg = "Test WinRM connection"
+                    $Param_WP.CurrentOperation = $Msg
+                    Write-Verbose "[$Computer] $Msg"
+                    Write-Progress @Param_WP
 
-                $Param_WSMan.computerName = $Computer
-                If ($Null = Test-WSMan @Param_WSMan ) {
-                    $Continue = $True
+                    If ($PSCmdlet.ShouldProcess($Computer,"`n$Msg`n")) {
+                        If ($Null = Test-WinRM -Computer $Computer) {$Continue = $True}
+                        Else {
+                            $Msg = "WinRM failure"
+                            $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                        }
+                    }
+                    Else {
+                        $Msg = "WinRM connection test cancelled by user"
+                        $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                    }
                 }
-                Else {
-                    $Msg = "WinRM connection failed on $Computer"
-                    #If ($ErrorDetails = [regex]:: match($_.Exception.Message,'(?<=\<f\:Message\>).+(?=\<\/f\:Message\>)',"singleline").value.trim()) {$Msg = "$Msg`n$ErrorDetails"}
-                    $Host.UI.WriteErrorLine("ERROR: $Msg")
-                }
-            }
-            Else {
-                $Msg = "WinRM connection test cancelled by user"
-                $Host.UI.WriteErrorLine("$Msg on $Computer")
-            }
-        } 
-        Else {
-            $Continue = $True
+                Else {$Continue = $True}
+            }        
         }
-        
+
         If ($Continue.IsPresent) {
             
             If ($PSCmdlet.ShouldProcess($Computer,$Activity)) {
                 
                 Try {
+                    $Msg = "Invoke command"
+                    If ($AsJob.IsPresent) {$Msg += " as PSJob"}
+                    $Param_WP.CurrentOperation = $Msg
+                    Write-Verbose "[$Computer] $Msg"
+                    Write-Progress @Param_WP
+
                     $Param_IC.ComputerName = $Computer
                     If ($AsJob.IsPresent) {
                         $Job = $Null
                         $Param_IC.JobName = "$JobPrefix`_$Computer"
                         $Job = Invoke-Command @Param_IC 
-                        $Msg = "Job ID $($Job.ID): $($Job.Name)"
-                        Write-Verbose $Msg
                         $Jobs += $Job
                     }
                     Else {
@@ -435,14 +452,14 @@ Process {
                     }
                 }
                 Catch {
-                    $Msg = "Operation failed on $Computer"
+                    $Msg = "Operation failed"
                     If ($ErrorDetails = $_.Exception.Message) {$Msg = "$Msg`n$ErrorDetails"}
-                    $Host.UI.WriteErrorLine("ERROR: $Msg")
+                    $Host.UI.WriteErrorLine("[$Computer] $Msg")
                 }
             }
             Else {
-                $Msg = "Operation cancelled by user on $Computer"
-                $Host.UI.WriteErrorLine($Msg)
+                $Msg = "Operation cancelled by user"
+                $Host.UI.WriteErrorLine("[$Computer] $Msg")
             }
         
         } #end if proceeding with script
@@ -457,57 +474,30 @@ End {
      If ($AsJob.IsPresent) {
 
         If ($Jobs.Count -gt 0) {
-        
-            If ($WaitForJob.IsPresent) {
-                $Msg = "$($Jobs.Count) job(s) created (waiting $JobWaitTimeout second(s) for output)"
-                Write-Verbose $Msg
-                $Activity = $Msg
-                Write-Progress -Activity $Activity
-                $FGColor = "Yellow"
-                If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
-                Else {Write-Verbose $Msg}
-
-                Start-Sleep 5
-
-                Try {
-                    $Results = @()
-                    If ($NotComplete = ($Jobs | Get-Job | Where-Object {(@("Failed","Running") -contains $_.State)})) {
-                        $Msg = "Not all jobs completed within the $JobWaitTimeout-second timeout period. Please run 'Get-Job -Id #'`n"
-                        Write-Warning $Msg
-                        Write-Verbose ($Notcomplete | Get-Job @StdParams | Out-String)
-                    }
-                    If (($Results = $Jobs | Get-Job | Wait-Job -Timeout $JobWaitTimeout | Receive-Job -ErrorAction SilentlyContinue -Verbose:$False).Count -gt 0) {
-                        Write-Output ($Results | Select -Property * -ExcludeProperty PSComputerName,RunspaceID)
-                    }
-                    Else {
-                        $Msg = "No job output returned (try -IncludeNoMatch to return data for computers where no matching services were found)"
-                        Write-Warning $Msg
-                    }
-                }
-                Catch {
-                    $Msg = "Please check job output manually using 'Get-Job -Id #' "
-                    $ErrorDetails = $_.Exception.Message
-                    $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
-                }
-            }
-            Else {
-                $Msg = "$($Jobs.Count) job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output"
-                Write-Verbose $Msg
-                $Jobs | Get-Job
-            }
+            $Msg = "[SCRIPT END] $($Jobs.Count) job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output"
+            $FGColor = "Green"
+            If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"`n$Msg")}
+            Else {Write-Verbose $Msg}
+            $Jobs | Get-Job
+            
         }
         Else {
-            $Msg = "No jobs created"
-            $Host.UI.WriteErrorLine($Msg)
+            $Msg = "[SCRIPT END]  No jobs created"
+            $Host.UI.WriteErrorLine("`n$Msg")
         }
     } #end if AsJob
 
     Else {
         If ($Results.Count -eq 0) {
-            $Msg = "No results found"
-            $Host.UI.WriteErrorLine($Msg)
+            $Msg = "[SCRIPT END] No results found"
+            $Host.UI.WriteErrorLine("`n$Msg")
         }
         Else {
+            $Msg = "[SCRIPT END] $($Results.Count) result(s) found"
+            $FGColor = "Green"
+            If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"`n$Msg")}
+            Else {Write-Verbose $Msg}
+            #Return $Results
             Write-Output ($Results | Select -Property * -ExcludeProperty PSComputerName,RunspaceID)
         }
     }
@@ -516,9 +506,13 @@ End {
 
 } # end Do-SomethingCool
 
+
 '@
 
-    # Splat
+    #endregion Here-string for function content    
+
+    #region Splat
+
     $Param_Snip = @{
         Title       = $SnippetName
         Description = $Description
@@ -531,10 +525,12 @@ End {
         $Param_Snip.Add("Force",$Force)
     }
 
+    #endregion Splat
+
     # What are we doing
     $Activity = "Create ISE Snippet '$SnippetName'"
     $BGColor = $host.UI.RawUI.BackgroundColor
-    $Msg = "ACTION: $Activity"
+    $Msg = "Action: $Activity"
     $FGColor = "Yellow"
     If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
     Else {Write-Verbose $Msg} 
@@ -548,7 +544,7 @@ Process {
     }    
     
     Else {
-        If ($PSCmdlet.ShouldProcess($env:COMPUTERNAME,$Activity)) {
+        If ($PSCmdlet.ShouldProcess($env:COMPUTERNAME,"`n`n`t$Activity`n`n")) {
         
             Try {
                 New-IseSnippet @Param_Snip

@@ -9,13 +9,15 @@ Function Save-PKISESession{
     
 .NOTES
     Name    : Function_Save-PKISESession.ps1
+    Created : 2016-05-29
     Author  : Paula Kingsley
-    Version : 1.0.0
+    Version : 02.00.000
     History :
     
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v1.0.0 - 2016-05-29 - Created script based on links
+        v1.0.0     - 2016-05-29 - Created script based on links
+        v02.0.0000 - 2018-02-14 - Updated with default path, standardization, changed force to noclobber
         
 .LINK
     https://itfordummies.net/2014/10/27/save-restore-powershell-ise-opened-scripts/
@@ -23,86 +25,34 @@ Function Save-PKISESession{
 .LINK
     https://stackoverflow.com/questions/3710374/get-encoding-of-a-file-in-windows   
 
-
 .EXAMPLE
     PS C:\> Save-PKISESession -Verbose
 
         VERBOSE: PSBoundParameters: 
 	
-        Key           Value                                              
-        ---           -----                                              
-        Verbose       True                                               
-        Force         False                                   
-        SavePath      C:\Users\PKINGS~1\AppData\Local\Temp\ISESession.txt
-        ScriptName    Save-PKISESession                                  
-        ScriptVersion 1.0.0           
-                                           
-        VERBOSE: Save 10 current tab(s) to C:\Users\PKINGS~1\AppData\Local\Temp\ISESession.txt
-        VERBOSE: Saved tabs to file
+        Key           Value                              
+        ---           -----                              
+        Verbose       True                               
+        SessionFile   C:\Users\jbloggs\PSISESession.txt
+        NoClobber     False                              
+        ScriptName    Save-PKISESession                  
+        ScriptVersion 2.0.0                              
+
+        WARNING: File 'C:\Users\jbloggs\PSISESession.txt' already exists and will be overwritten
+        VERBOSE: Save 13 current tab(s) to 'C:\Users\jbloggs\PSISESession.txt'
+        VERBOSE: Saved 13 tab(s) to file 'C:\Users\jbloggs\PSISESession.txt'
 
 .EXAMPLE
-    PS C:\> Save-PKISESession -SavePath c:\temp\foo.log -Verbose
+    PS :\> Save-PKISESession -SessionFile c:\temp\newsessionfile.txt -NoClobber
 
-        VERBOSE: PSBoundParameters: 
-	
-        Key           Value            
-        ---           -----            
-        SavePath      c:\temp\foo.log  
-        Verbose       True             
-        Force         False            
-        ScriptName    Save-PKISESession
-        ScriptVersion 1.0.0            
+        ERROR: File 'c:\temp\newsessionfile.txt' already exists and will not be overwritten (-NoClobber detected)
 
-        VERBOSE: Save 10 current tab(s) to c:\temp\foo.log
+.EXAMPLE
+    PS C:\> Save-PKISESession -SavePath c:\temp\newsessionfile.txt
+
+        WARNING: File 'c:\temp\newsessionfile.txt' already exists and will be overwritten
         Operation cancelled by user
 
-.EXAMPLE
-    PS C:\> Save-PKISESession -SavePath c:\temp\foo.log -Verbose
- 
-        VERBOSE: PSBoundParameters: 
-	
-        Key           Value            
-        ---           -----            
-        SavePath      c:\temp\foo.log  
-        Verbose       True             
-        Force         False            
-        ScriptName    Save-PKISESession
-        ScriptVersion 1.0.0            
-
-        VERBOSE: Save 10 current tab(s) to c:\temp\foo.log
-        VERBOSE: Saved tabs to file
-
-.EXAMPLE
-    PS C:\> Save-PKISESession -SavePath c:\temp\foo.log -Verbose
-
-        VERBOSE: PSBoundParameters: 
-	
-        Key           Value            
-        ---           -----            
-        SavePath      c:\temp\foo.log  
-        Verbose       True             
-        Force         False            
-        ScriptName    Save-PKISESession
-        ScriptVersion 1.0.0            
-
-        File 'c:\temp\foo.log' already exists; please use -Force to overwrite
-
-.EXAMPLE
-    PS C:\> Save-PKISESession -SavePath c:\temp\foo.log -Force -Verbose
-
-        VERBOSE: PSBoundParameters: 
-	
-        Key           Value            
-        ---           -----            
-        SavePath      c:\temp\foo.log  
-        Force         True             
-        Verbose       True             
-        ScriptName    Save-PKISESession
-        ScriptVersion 1.0.0            
-
-        WARNING: File 'c:\temp\foo.log' already exists and will be overwritten
-        VERBOSE: Save 10 current tab(s) to c:\temp\foo.log
-        VERBOSE: Saved tabs to file
 
 #>
 
@@ -113,22 +63,23 @@ Function Save-PKISESession{
 Param(
     [Parameter(
         Position=0,
+        Mandatory = $False,
         HelpMessage = "Output file for session storage (will be created if nonexistent)"
     )]
     [ValidateNotNullOrEmpty()]
-    [String]$SavePath = "$env:temp\ISESession.txt",
+    [String]$SessionFile = "$Home\PSISESession.txt",
 
     [Parameter(
-        HelpMessage = "Overwrite existing entries in file"
+        HelpMessage = "Don't overwrite existing entries in file"
     )]
     [ValidateNotNullOrEmpty()]
-    [switch]$Force
+    [switch]$NoClobber
 
 )
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "1.0.0"
+    [version]$Version = "02.00.0000"
 
     # Show our settings
     $CurrentParams = $PSBoundParameters
@@ -150,7 +101,6 @@ Begin {
         Verbose = $False
     }
 
-
     If ($Host.Name -ne "Windows PowerShell ISE Host") {
         $Msg = "This script requires the PowerShell ISE; current  host is '$($Host.Name)'"
         $Host.UI.WriteErrorLine($Msg)
@@ -159,39 +109,35 @@ Begin {
 }
 Process{
 
-    If ($Null = Test-Path $SavePath -ErrorAction SilentlyContinue) {
-        $Msg = "File '$SavePath' already exists"
-        If ($Force.IsPresent) {
-            $Msg = "$Msg and will be overwritten"
-            Write-Warning $Msg    
-        }
-        Else {
-            $Msg = "$Msg; please use -Force to overwrite"
-            $Host.UI.WriteErrorLine($Msg)
+    If ($Null = Test-Path $SessionFile -ErrorAction SilentlyContinue) {
+        $Msg = "File '$SessionFile' already exists"
+        If ($NoClobber.IsPresent) {
+            $Msg = "$Msg and will not be overwritten (-NoClobber detected)"
+            $Host.UI.WriteErrorLine("ERROR: $Msg")
             Break
         }
+        Else {
+            $Msg = "$Msg and will be overwritten"
+            Write-Warning $Msg    
+        }        
     }
 
-    $Msg = "Save $($psISE.PowerShellTabs.Files.Count) current tab(s) to '$SavePath'"
+    $Msg = "Save $($psISE.PowerShellTabs.Files.Count) current tab(s) to '$SessionFile'"
     Write-Verbose $Msg
-    If ($PSCmdlet.ShouldProcess($Env:ComputerName,$Msg)) {
+    $ConfirmMsg = "`n`n`t$Msg`n`n"
+    If ($PSCmdlet.ShouldProcess($Env:ComputerName,$ConfirmMsg)) {
         Try {
             $psISE.CurrentPowerShellTab.Files | Foreach-Object {$_.SaveAs($_.FullPath)}
-            #"ise ""$($psISE.PowerShellTabs.Files.FullPath -join'/')""" | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
             
             # Using forward spash for delimiter as we may have commas or semicolons in the filename
+            $($psISE.PowerShellTabs.Files.FullPath -join'/') | Out-File -Encoding UTF8 -FilePath $SessionFile -Confirm:$False -EA Stop -Verbose:$False
 
-            #"""$($psISE.PowerShellTabs.Files.FullPath -join'/')""" | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
-            $($psISE.PowerShellTabs.Files.FullPath -join'/') | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
-
-            #"ise ""$($psISE.PowerShellTabs.Files.FullPath -join',')""" | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
-            #"ise ""$($psISE.PowerShellTabs.Files.FullPath -join'";"')""" | Out-File -Encoding UTF8 -FilePath $SavePath -Confirm:$False -EA Stop -Verbose:$False
-            
-            $Msg = "Saved $($psISE.CurrentPowerShellTab.Files.count) tab(s) to file '$SavePath'"
+            $Msg = "Saved $($psISE.CurrentPowerShellTab.Files.count) tab(s) to file '$SessionFile'"
             Write-Verbose $Msg
         }
         Catch {
-            $Msg = $_.Exception.Message
+            $Msg = "Operation failed"
+            If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
             $Host.UI.WriteErrorLine($Msg)
         }
     }

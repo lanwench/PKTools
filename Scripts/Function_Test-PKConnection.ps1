@@ -1,171 +1,125 @@
-﻿#requires -Version 3
-Function Test-PKConnection {
+﻿#requires -version 3
+function Test-PKConnection {
 <#
 .SYNOPSIS
-    Performs various connectivity tests to remote computers
+    Uses Get-WMIObject and the Win32_PingStatus class to quickly ping one or more targets, either interactively or as a PSJob
 
 .DESCRIPTION
-    Performs various connectivity tests to remote computers
-    Looks up name in DNS, and defaults to testing: Ping, RDP, Registry, SSH, WinRM and WMI
-    Optionally, -Tests parameter brings up menu for selection, including CredSSP
+    Uses Get-WMIObject and the Win32_PingStatus class to quickly ping one or more targets, either interactively or as a PSJob
     Accepts pipeline input
-    Returns a PSobject
+    Outputs a PSObject or PSJob
 
-.NOTES        
+.Notes
     Name    : Function_Test-PKConnection.ps1
-    Created : 2017-11-20
+    Created : 2018-02-20
     Author  : Paula Kingsley
-    Version : 01.00.0001
-    History:
+    Version : 01.00.0000
+    History :
+        
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
-        
-        v01.00.0000 - 2017-11-20 - Created script based on jrich's original
-        v01.00.0001 - 2017-11-30 - Updated help
-        
+        v01.00.0000 - 2018-02-20 - Created script based on original in Idera link
+
 .LINK
-    https://gallery.technet.microsoft.com/scriptcenter/Powershell-Test-Server-e0cdea9a?ranMID=24542&ranEAID=je6NUbpObpQ&ranSiteID=je6NUbpObpQ-1p7VW5KEESFnLgSaMed_Bw&tduid=(05cc9a118b47a445311a4d27bb47d63a)(256380)(2459594)(je6NUbpObpQ-1p7VW5KEESFnLgSaMed_Bw)()
+    http://community.idera.com/powershell/powertips/b/tips/posts/creating-highspeed-ping-part-4
 
 .PARAMETER ComputerName
-    Name of computer to check; separate multiple names with commas
+    One or more computer names or target IPs
 
-.PARAMETER CredSSP
-    Include CredSSP test (requires credential)
+.PARAMETER TimeoutMillisec
+    Timeout in milliseconds (default is 1000)
 
-.PARAMETER Credential
-    Valid credential on target
+.PARAMETER AsJob
+    Run as local PSJob using Start-Job
 
-.PARAMETER Tests
-    Tests to perform (Default is DNS, Ping, RDP, Registry, SSH, WinRM and WMI; ShowMenu allows for selection, including CredSSP)
-
-.PARAMETER SuppressconsoleOutput
+.PARAMETER SuppressConsoleOutput
     Suppress all non-verbose/non-error console output
 
 .EXAMPLE
-    PS C:\> Test-PKConnection server222 -Verbose
+    Test-PKConnection -ComputerName ops-vmtest-1 -Verbose
 
         VERBOSE: PSBoundParameters: 
 	
-        Key                   Value                                    
-        ---                   -----                                    
-        Verbose               True                                     
-        ComputerName          {server222}                           
-        Credential            System.Management.Automation.PSCredential
-        Tests                 Default                                  
-        SuppressConsoleOutput False                                    
-        ScriptName            Test-PKConnection                        
-        ScriptVersion         1.0.0                                    
-        PipelineInput         False                                    
+        Key                   Value            
+        ---                   -----            
+        ComputerName          {ops-vmtest-1}   
+        Verbose               True             
+        TimeoutMillisec       1000             
+        AsJob                 False            
+        SuppressConsoleOutput False            
+        PipelineInput         False            
+        ScriptName            Test-PKConnection
+        ScriptVersion         1.0.0            
 
-        Action: Test connectivity
-        VERBOSE: ComputerName : server222
-        VERBOSE: DNS          : 0.02
-        VERBOSE: RDP          : 0.03
-        VERBOSE: Ping         : 0.05
-        VERBOSE: WinRM        : 0.02
-        VERBOSE: Registry     : 12.44
-        VERBOSE: WMI          : 0.89
-        SSH test failed on server222
-        VERBOSE: SSH          : 1.04
-        VERBOSE: TOTAL        : 14.50
+        VERBOSE: Test fast ping via WMI using -millisecond timeout
+        VERBOSE: Pinging 1 target(s)
 
-        VERBOSE: Testing for 1 computer(s) completed in 14.50s
-
-
-        ComputerName   : server222
-        IP             : 10.11.12.13
-        Domain         : server222.domain.local
-        DNS            : True
-        Ping           : True
-        WSMAN          : True
-        CredSSP        : -
-        RemoteReg      : True
-        RPC            : True
-        RDP            : True
-        SSH            : False
-        ElapsedSeconds : 14.49
-        Messages       : 1 connection test(s) failed
+        Address       Alive  StatusCode
+        -------       -----  ----------
+        ops-vmtest-1  True            0
 
 .EXAMPLE
-    PS C:\> Get-VM ops*  | Test-PKConnection | Format-Table -AutoSize
+    PS C:\> $Arr | Test-PKConnection -Verbose
 
-        Action: Perform 7 network connectivity test(s)
-        RDP test failed on ops-monitor-1
-        WinRM test failed on ops-monitor-1
-        Registry test failed on ops-monitor-1
-        WMI test failed on ops-monitor-1
-        RDP test failed on ops-ftpeval-fw-1
-        WinRM test failed on ops-ftpeval-fw-1
-        Registry test failed on ops-ftpeval-fw-1
-        WMI test failed on ops-ftpeval-fw-1
-        RDP test failed on ops-device42-2
-        WinRM test failed on ops-device42-2
-        Registry test failed on ops-device42-2
-        WMI test failed on ops-device42-2
-        SSH test failed on ops-device42-2
-        SSH test failed on ops-pdamweb-1
-        SSH test failed on ops-sgwin-1
-        RDP test failed on ops-jenkins-dev-1
-        WinRM test failed on ops-jenkins-dev-1
-        Registry test failed on ops-jenkins-dev-1
-        WMI test failed on ops-jenkins-dev-1
-        SSH test failed on ops-windev-1
+        VERBOSE: PSBoundParameters: 
+	
+        Key                   Value            
+        ---                   -----            
+        Verbose               True             
+        ComputerName                           
+        TimeoutMillisec       1000             
+        AsJob                 False            
+        SuppressConsoleOutput False            
+        PipelineInput         True             
+        ScriptName            Test-PKConnection
+        ScriptVersion         1.0.0            
 
+        VERBOSE: Test fast ping via WMI using 1000-millisecond timeout
 
-        ComputerName      IP            Domain                     DNS Ping WSMAN CredSSP RemoteReg   RPC   RDP
-        ------------      --            ------                     --- ---- ----- ------- ---------   ---   ---
-        ops-monitor-1     10.11.178.29  internal.lan               True True False -           False False False
-        ops-ftpeval-fw-1  10.11.86.17   internal.lan               True True False -           False False False
-        ops-device42-2    10.11.128.204 internal.lan               True True False -           False False False
-        ops-pdamweb-1     10.11.178.103 internal.lan               True True  True -            True  True  True
-        ops-sgwin-1       10.11.178.67  internal.lan               True True  True -            True  True  True
-        ops-jenkins-dev-1 10.11.178.119 internal.lan               True True False -           False False False
-        ops-windev-1      10.11.178.120 OPS-WINDEV-1.internal.lan  True True  True -            True  True  True
+        Address                      Alive StatusCode
+        -------                      ----- ----------
+        server14.domain.local        True          0
+        webserver11.domain.local     True          0
+        workstation11.domain.local   True          0
+        10.11.12.13                  True          0
+        legacyweb.domain.local       False     11010
+        sql-dev.domain.local         True          0
+        google.com                   True          0
 
 #>
-[cmdletBinding()]
+[cmdletbinding()]
 param(
-	[parameter(
+    [Parameter(
+        ValueFromPipeline,
+        Mandatory,
         Position = 0,
-        Mandatory=$True,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True,
-        HelpMessage = "Computer name(s)"
-    )]
-    [Alias("Name","DNSHostName","FQDN","HostName")]
-    [ValidateNotNullOrEmpty()]
-	[string[]]$ComputerName,
-
-    [parameter(
-        Mandatory=$False,
-        HelpMessage = "Credentials on target computer"
-    )]
-	
-    [pscredential] $Credential = [System.Management.Automation.PSCredential]::Empty ,
-
-    [parameter(
-        Mandatory=$False,
-        HelpMessage = "Tests to perform (Default or ShowMenu)"
+        HelpMessage = "One or more computer names or IP addresses"
     )]
     [ValidateNotNullOrEmpty()]
-    [ValidateSet("Default","ShowMenu")]
-	[string]$Tests = "Default",
+    [string[]]$ComputerName,
+    
+    [Parameter(
+        Position = 1,
+        HelpMessage = "Timeout in milliseconds for ping (default is 1000)"
+    )]
+    [ValidateNotNullOrEmpty()]
+    [int]$TimeoutMillisec = 1000,
 
-	##[parameter(
-    #    Mandatory=$False
-    #)]
-	#[switch]$IncludeCredSSP,
+    [Parameter(
+        ParameterSetName = "Job",
+        Mandatory = $False,
+        HelpMessage = "Run as PSJob"
+    )]
+    [Switch] $AsJob,
 
     [Parameter(
         Mandatory=$False,
         HelpMessage="Hide all non-verbose/non-error console output"
     )]
     [Switch] $SuppressConsoleOutput
-
-)    
-	
+)
 Begin {
-
+    
     # Current version (please keep up to date from comment block)
     [version]$Version = "01.00.0000"
 
@@ -178,465 +132,73 @@ Begin {
         Where {Test-Path variable:$_}| Foreach {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+    $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
     $CurrentParams.Add("ScriptVersion",$Version)
-    $CurrentParams.Add("PipelineInput",$PipelineInput)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
-
-    # Preferences 
-    $ErrorActionPreference = "Stop"
-    $ProgressPreference    = "Continue"
-    
-    # For time tally, output object
-    $ScriptStartTime = Get-Date
-	
-    #region parameter cleanup & selection
-
-    # Can't use implicit credentials with CredSSP
-	If ($IncludeCredSSP.IsPresent -and (-not $Credential)){
-        $Msg = "Credentials must be provided when testing CredSSP"
-        $Host.UI.WriteErrorLine("ERROR: $MSg")
-        Break
+        
+    # Inner function if not running as job
+    If (-not $AsJob.IsPresent) {
+        Function GetStatus{
+            If ($_.StatusCode -eq 0){$True}
+            Else {$False}
+        }    
     }
+
+    $Msg = "Test fast ping via WMI using $TimeoutMillisec-millisecond timeout"
+    If ($AsJob.IsPresent) {$Msg += " as PowerShell job"}
+    $Activity = $Msg
+    Write-Verbose $Msg
+}
+Process {    
     
-    [array]$Menu = "CredSSP","DNS","Ping","RDP","Registry","SSH","WinRM","WMI"
-    If ($Tests -eq "ShowMenu") {
-        If (([array]$Selection = ($Menu | Sort | Out-GridView -Title "Select one or more tests (DNS test is mandatory and will be added if not selected)" -OutputMode Multiple)).Count -eq 0){
-            $Msg = "At least one selection is mandatory"
-            $Host.UI.WriteErrorLine("ERROR: $Msg")
-            Break
-        }
-        Else {
-            If ($Selection -notcontains "DNS") {$Selection += "DNS"}
-            $Msg = "$($Selection.Count) test(s) selected"
-            Write-Verbose $Msg
-            $Msg = $Selection -join(", ")
-            Write-Verbose $Msg
-        }
+    # convert list of computers into a WMI query string
+    If ($PipelineInput) {
+        $query = $_ -join "' or Address='"
+        $Msg = "Query is $Query"
+        Write-Verbose $Msg
+        
     }
     Else {
-        [array]$Selection = $Menu | Where-Object {$_ -ne "CredSSP"}
+        $query = $ComputerName -join "' or Address='"
+        $Msg = "Pinging $($ComputerName.Count) target(s)"
+        Write-Verbose $Msg
+        $Msg = "Query is $Query"
+        Write-Verbose $Msg
     }
 
-    #endregion Parameter cleanup & selection
+    Write-Progress -Activity $Activity -CurrentOperation $Msg
 
-    #region splats
-
-    # General purpose splat
-    $StdParams = @{}
-    $StdParams = @{
-        ErrorAction = "Stop"
-        Verbose     = $False
-    }
-
-    # Splat for Write-Progress
-    $Activity = "Perform $($Selection.Count) network connectivity test(s)"
-    $Param_WP = @{}
-    $Param_WP = @{
-        Activity         = $Activity
-        CurrentOperation = $Null
-        Status           = "Working"
-        PercentComplete  = $Null
-    }
-    
-    #endregion Splats
-        
-    #region functions
-
-    # Mini function to avoid DNS lookup errors
-    function LookupDNS {
-        Param($Name)
-        Try {
-            If ($Lookup = [Net.Dns]::GetHostEntry($Name)) {
-                Write-Output $Lookup
+    If ($AsJob.IsPresent) {
+        $SB = {
+            Param($Query,$TimeoutMillisec)
+                Function GetStatus{
+                    If ($_.StatusCode -eq 0){$True}
+                    Else {$False}
+                }
+            Try {
+                Get-WmiObject -Class Win32_PingStatus -Filter "(Address='$Using:query') and timeout=$Using:TimeoutMillisec" -EA SilentlyContinue | 
+                    Select-Object -Property Address,@{N="Alive";E={GetStatus}},StatusCode
+            }
+            Catch {
+                $Host.UI.WriteErrorLine($_.Exception)
             }
         }
-        Catch {}
+        Start-Job -ScriptBlock $SB
+        #Invoke-Command  -AsJob
     }
-
-    #endregion functions
-
-    #region  Output
-    $InitialValue = "Error"
-    $OutputTemplate = New-Object PSObject -Property ([ordered]@{
-        ComputerName   = $InitialValue
-        IP             = $InitialValue
-        Domain         = $InitialValue
-        DNS            = $InitialValue
-        Ping           = $InitialValue
-        WSMAN          = $InitialValue
-        CredSSP        = $InitialValue
-        RemoteReg      = $InitialValue
-        RPC            = $InitialValue
-        RDP            = $InitialValue
-        SSH            = $InitialValue
-        ElapsedSeconds = $InitialValue
-        Messages       = $InitialValue
-    })
-
-    $Results = @()
-
-    # To line up verbose output 
-    $LongestLabel = "ComputerName"
-    $Length = $LongestLabel.Length
-    $Pad = $Length + 1
-
-    #endregion Output
-    
-    # Console output
-    $BGColor = $Host.UI.RawUI.BackgroundColor
-    $Msg = "Action: $Activity"
-    $FGColor = "Yellow"
-    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
-    Else {Write-Verbose $Msg}
-
+    Else {
+        Try {
+            Get-WmiObject -Class Win32_PingStatus -Filter "(Address='$query') and timeout=$TimeoutMillisec" -EA SilentlyContinue | 
+                Select-Object -Property Address,@{N="Alive";E={GetStatus}},StatusCode
+        }
+        Catch {
+            $Host.UI.WriteErrorLine($_.Exception)
+        }
+    }
 }
-process{
-    
-    $Total = $ComputerName.Count
-    [int]$Current = 0
 
-    Foreach ($Computer in $ComputerName){
-        
-        $Current ++
-        $Param_WP.CurrentOperation = $Computer
-        $Param_WP.PercentComplete = ($Current / $Total * 100)
-
-        $Output = $OutputTemplate.PSObject.Copy()
-        $Output.ComputerName = $Computer
-
-        $Failures = 0
-        $TimeTally = 0
-
-        $ComputerStartTime = Get-Date
-	    $DT = $CDT = Get-Date
-
-        $Label = "ComputerName"
-        $Msg = "$($Label.PadRight($Pad, ' ')): $Computer"
-        Write-Verbose $Msg
-
-        $failed = 0
-
-        $Msg = "Look up IP in DNS"
-        $Param_WP.Status = $Msg
-        Write-Progress @Param_WP
-
-        [switch]$Continue = $False
-
-        # Lookup in DNS
-	    Try{
-	        If ($DNSEntity = LookupDNS -Name $Computer) {
-	            $Domain = ($DNSEntity.hostname).replace("$Computer.","")
-	            [string[]]$IPs = $DNSEntity.AddressList | Foreach-Object {$_.IPAddressToString}
-                $Output.Domain = $Domain
-
-                $Label = "DNS"
-                $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-                $TimeTally += $Time
-                $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	            Write-verbose $Msg
-            
-                $Output.DNS = $True
-
-                $Continue = $True
-            }
-            Else {
-                $Msg = "DNS lookup failed for $Computer"
-                $Host.UI.WriteErrorLine("ERROR: $Msg")
-                $Output.Messages = $Msg		        
-
-                $Output.Ping = $Output.WSMAN = $Output.RDP = $Output.RemoteReg = $Output.RPC = $False
-                If ($Output.CredSSP -ne "-") {$Output.CredSSP = $False}
-
-                $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-                $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	            Write-verbose $Msg
-
-                $OutputTotal = $Time
-                $Output.DNS = $False
-                
-		    
-                $Results += $Output
-            }
-	    }
-	    Catch {
-		    $Msg = "DNS lookup failed for $Computer"
-            If ($ErrorDetails = $_.Exception.Message) {$Msg = "$Msg`n$ErrorDetails"}
-            $Host.UI.WriteErrorLine("ERROR: $Msg")
-            $Output.Messages = $Msg
-		    
-            $Output.Ping = $Output.WSMAN = $Output.RDP = $Output.RemoteReg = $Output.RPC = $False
-            If ($Output.CredSSP -ne "-") {$Output.CredSSP = $False}
-
-            $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-            $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	        Write-verbose $Msg
-
-            $OutputTotal = $Time
-            $Output.DNS = $False
-		    
-            $Results += $Output
-	    }
-        
-        
-	    If ($Continue.IsPresent) {
-    	    
-            foreach ($IP in $IPs) {
-
-                $Output1 = $Output.PSObject.Copy()	            
-                $Output1.IP = $IP
-
-                $Label = "Ping"
-                If ($Selection -contains $Label) {
-                    
-                    $Msg = "Test $Label"
-                    $Param_WP.Status = $Msg
-                    Write-Progress @Param_WP
-
-                    Try {
-	                    If (Test-Connection $IP -count 1 -Quiet) {
-			                $Output1.Ping = $True
-                        }
-			            Else {
-                            $Output1.Ping = $False
-                            $Msg = "$Label test failed on $Computer"
-                            $Host.UI.WriteErrorLine($Msg)
-                            $Failures ++
-                        }
-                    }
-                    Catch {
-                        $Output1.Ping = $False
-                        $Msg = "$Label test failed on $Computer"
-                        $Host.UI.WriteErrorLine($Msg)
-                        $Failures ++
-                    }
-                    
-                    $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-                    $TimeTally += $Time
-                    $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	                Write-verbose $Msg
-                }
-                Else {
-                    $Output1.Ping = "-"
-                }
-
-                $Label = "RDP"
-                If ($Selection -contains $Label) {
-                
-                    $Msg = "Test $Label"
-                    $Param_WP.Status = $Msg
-                    Write-Progress @Param_WP
-		            Try {
-                        $Socket = New-Object Net.Sockets.TcpClient($IP, 3389)
-		                If ($Socket -eq $null) {
-			                $Output1.RDP = $False
-                            $Msg = "$Label test failed on $Computer"
-                            $Host.UI.WriteErrorLine($Msg)
-                            $Failures ++
-		                }
-		                else {
-			                $Output1.RDP = $True
-			                $socket.close()
-		                }
-                    }
-                    Catch {
-                        $Output1.RDP = $False
-                        $Msg = "$Label test failed on $Computer"
-                        $Host.UI.WriteErrorLine($Msg)
-                        $Failures ++
-                    }
-		        
-                    $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-                    $TimeTally += $Time
-                    $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	                Write-verbose $Msg
-                }
-                Else {
-                    $Output1.RDP = "-"
-                }
-
-                
-                $Label = "WinRM"
-                If ($Selection -contains $Label) {
-
-                    $Msg = "Test $Label"
-                    $Param_WP.Status = $Msg
-                    Write-Progress @Param_WP
-
-                    Try {
-                        #Test-WSMan $IP -Credential $Credential | Out-Null				        
-                        Test-WSMan $IP | Out-Null
-				        $Output1.WSMAN = $True
-				    }
-			        Catch {
-                        $Output1.WSMAN = $False
-                        $Msg = "$Label test failed on $Computer"
-                        $Host.UI.WriteErrorLine($Msg)
-                        $Failures ++
-                    }
-
-                    $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-                    $TimeTally += $Time
-                    $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	                Write-verbose $Msg
-                }
-                Else {
-                    $Output1.WSMAN = "-"
-                }
-                
-                $Label = "CredSSP"
-                If ($Selection -contains $Label) {
-                    
-                    $Msg = "Test $Label"
-                    $Param_WP.Status = $Msg
-                    Write-Progress @Param_WP				    
-                        
-                    Try {
-					    Test-WSMan $ip -Authentication Credssp -Credential $Credential
-					    $Output1.CredSSP = $True
-					}
-				    Catch {
-                        $Output1.CredSSP = $False
-                        $Msg = "$Label test failed on $Computer"
-                        $Host.UI.WriteErrorLine($Msg)
-                        $Failures ++
-                    }
-                
-                    $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-                    $TimeTally += $Time
-                    $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	                Write-verbose $Msg
-			    }
-                Else {
-                    $Output1.CredSSP = "-"
-                }
-                
-                $Label = "Registry"   
-                If ($Selection -contains $Label) {    
-
-                    $Msg = "Test $Label"
-                    $Param_WP.Status = $Msg
-                    Write-Progress @Param_WP
-                    Try {
-				        [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $IP) | Out-Null
-				        $Output1.RemoteReg = $True
-			        }
-			        Catch {
-                        $Output1.RemoteReg = $False
-                        $Msg = "$Label test failed on $Computer"
-                        $Host.UI.WriteErrorLine($Msg)
-                        $Failures ++
-                    }
-		            	        
-                    $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-                    $TimeTally += $Time
-                    $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	                Write-verbose $Msg
-                }
-                Else {
-                    $Output1.RemoteReg = "-"
-                }
-                
-                $Label = "WMI"
-                If ($Selection -contains $Label) {                    
-                    $Msg = "Test $Label"
-                    $Param_WP.Status = $Msg
-                    Write-Progress @Param_WP
-                    Try {	
-				        $w = [wmi] ''
-				        #$w.psbase.options.timeout = 15000000
-                        $w.psbase.options.timeout = 15000
-				        $w.path = "\\$Computer\root\cimv2:Win32_ComputerSystem.Name='$Computer'"
-				        $w | select none | Out-Null
-				        $Output1.RPC = $True
-			        }
-			        Catch {
-                        $Output1.RPC = $False
-                        $Msg = "$Label test failed on $Computer"
-                        $Host.UI.WriteErrorLine($Msg)
-                        $Failures ++
-                    }
-
-                    $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-                    $TimeTally += $Time
-                    $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	                Write-verbose $Msg
-                }
-                Else {
-                    $Output1.RPC = "-"
-                }
-
-                $Label = "SSH"
-                If ($Selection -contains $Label) {
-                    
-                    $Msg = "Test $Label"
-                    $Param_WP.Status = $Msg
-                    Write-Progress @Param_WP
-                    Try {
-                        $Test = New-Object System.Net.Sockets.TcpClient
-                        If ($Test.Connect($Computer, 22) -eq $Null) {
-                            $Output1.SSH = $True
-                        }
-                        Else {
-                            $Output1.SSH = $False
-                            $Msg = "$Label test failed on $Computer"
-                            $Host.UI.WriteErrorLine($Msg)
-                            $Failures ++
-                        }
-			        }
-			        Catch {
-                        $Output1.SSH = $False
-                        $Msg = "$Label test failed on $Computer"
-                        $Host.UI.WriteErrorLine($Msg)
-                        $Failures ++
-                    }
-		     
-                    $Time = "{0:N2}" -f $((New-TimeSpan $DT ($DT = get-date)).totalseconds)
-                    $TimeTally += $Time
-                    $Msg = "$($Label.PadRight($Pad, ' ')): $Time"
-	                Write-verbose $Msg
-                }
-                Else {
-                    $Output1.SSH = "-"
-                }
-
-                # Total time
-                $Time = "{0:N2}" -f $((New-TimeSpan $ScriptStartTime ($DT)).totalseconds)
-                $Label = "TOTAL"
-                $Msg = "$($Label.PadRight($Pad, ' ')): $Time`n"
-        
-                $Output1.ElapsedSeconds = "{0:N2}" -f $TimeTally
-
-                If ($Failures.Count -gt 0) {
-                    $Output1.Messages = "$($Failures.Count) connection test(s) failed"
-                }
-                Else {
-                    $Output1.Messages = "All tests completed successfully"
-                }
-
-                # Add them up
-                $Results += $Output1
-            
-            } #end foreach IP
-    
-        } #end If DNS lookup successful
-
-        
-        Write-Verbose $Msg
-        
-    } #end foreach computer
+End { 
+    Write-Progress -Activity $Activity -CurrentOperation $Msg -Completed
 }
-end{
-    
-    Write-Progress -Activity $Activity -Completed
-
-    $Host.UI.WriteLine()
-
-    $TotalSec = "{0:N2}" -f $((New-TimeSpan $ScriptStartTime ($DT)).totalseconds)
-    $Msg = "Testing for $Total computer(s) completed in $TotalSec`s"
-	Write-Verbose $Msg
-
-    Write-Output $Results 
-
-}
-} #end Test-PKConnection
+} #end Invoke-PKFastPing
