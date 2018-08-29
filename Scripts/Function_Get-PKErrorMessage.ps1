@@ -12,12 +12,13 @@
     Name    : Function_Get-PKErrorMessage
     Created : 2018-05-17
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01.0000
     History :
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK
 
         v01.00.0000 - 2018-05-17 - Created script based on Idera PowerTip
+        v01.01.0000 - 2018-08-29 - Removed test line at bottom
 
 .LINK
     http://community.idera.com/powershell/powertips/b/tips/posts/converting-error-records
@@ -41,10 +42,9 @@ Function Get-PKErrorMessage {
   param(
     
     [Parameter(
-        #Mandatory = $False,
         ValueFromPipeline,
-        ParameterSetName="ErrorRecord",
-        Position=0
+        ParameterSetName = "ErrorRecord",
+        Position = 0
     )]
     [ValidateNotNullOrEmpty()]
     [Management.Automation.ErrorRecord]$Record = $Error[0],
@@ -52,15 +52,15 @@ Function Get-PKErrorMessage {
     [Parameter(
         Mandatory,
         ValueFromPipeline,
-        ParameterSetName="Unknown", 
-        Position=0
+        ParameterSetName = "Unknown", 
+        Position = 0
     )]
     [Object]$Alien
   )
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01.0000"
 
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
@@ -73,9 +73,6 @@ Begin {
     $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
-
-    # Preference
-    #$ErrorActionPreference = "Stop"
 
     $Msg = "Return error details"
     Write-Verbose $Msg
@@ -104,12 +101,3 @@ Process{
     }
 }
 } # End Get-PKErrorMessage
-
-
-
-#Get-Random -Minimum 50 -Maximum 
-
-
-#Get-Random -Maximum $array.count
-
-Get-PKErrorMessage -Verbose
