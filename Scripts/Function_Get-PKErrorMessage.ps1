@@ -1,6 +1,7 @@
-﻿#requires -Version 3
+﻿#requires -version 4
+Function Get-PKErrorMessage {
 <#
-.SUMMARY
+.SYNOPSIS
     Returns details about errors from ErrorRecord objects
 
 .DESCRIPTION
@@ -37,10 +38,8 @@
 
 #>
 
-Function Get-PKErrorMessage {
-  [CmdletBinding(DefaultParameterSetName="ErrorRecord")]
-  param(
-    
+[CmdletBinding(DefaultParameterSetName="ErrorRecord")]
+param(
     [Parameter(
         ValueFromPipeline,
         ParameterSetName = "ErrorRecord",
@@ -56,7 +55,7 @@ Function Get-PKErrorMessage {
         Position = 0
     )]
     [Object]$Alien
-  )
+)
 Begin {
 
     # Current version (please keep up to date from comment block)
