@@ -12,7 +12,7 @@
 RootModule = 'PKTools.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.11.1000'
+ModuleVersion = '1.12.0000'
 
 # ID used to uniquely identify this module
 GUID = '3a49eaff-5e0f-41db-b149-3dc1f36968c1'
