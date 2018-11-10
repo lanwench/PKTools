@@ -562,6 +562,9 @@ End {
 
 
 '@
+    
+    $Body = $Body.Replace("##AUTHOR##",$AuthorName)
+    $Body = $Body.Replace("##CREATEDATE##",(Get-Date -f yyyy-MM-dd))
 
     #endregion Here-string for function content    
 

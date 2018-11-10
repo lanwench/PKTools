@@ -25,7 +25,8 @@ Function New-PKISESnippetFunctionGeneric {
 
 .PARAMETER AutoDetectAuthorFullName
     Attempt to match the current username to their full name via the registry & WMI
-    .PARAMETER Force
+
+.PARAMETER Force
     Forces creation even if snippet name exists
 
 .EXAMPLE
