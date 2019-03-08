@@ -296,14 +296,7 @@ Begin {
 
 Process {
     
-    #$Type = "PSCustomObject"
-    #If ($InputObject.GetType().Name -ne $Type) {
-    #    $Msg = "Input object type is '$($InputObject.GetType().Name)'; please specify a PSCustomObject"
-    #    $Host.UI.WriteErrorLine("ERROR: $Msg")
-    #}
-
-    #Else {
-
+    
         # Create ordered hashtable from array
         $TableHash = [ordered]@{}
         $TableHash = [ordered]@{}
@@ -355,7 +348,7 @@ Process {
 }
 End {}
 
-} # end Do-SomethingCool
+} # end Convert-PKJiraMarkdownTable
 
 
 
@@ -448,10 +441,3 @@ If ($IsPanel.IsPresent) {
 
 #>
 
-
-[pscustomobject]$TestObj = @()
-
-$Obj | Foreach-Object {
-    #$TestObj | Add-Member -MemberType NoteProperty -Name $_.Name -Value $_.Status -Force
-    $TestObj += New-Object PSObject -Property @{$_.Name=$_.Status}
-}

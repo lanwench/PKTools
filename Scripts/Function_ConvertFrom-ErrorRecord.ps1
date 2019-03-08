@@ -22,26 +22,24 @@ function ConvertFrom-ErrorRecord {
 
 #>
 
-  param(
+param(
 
-    [Parameter(
-        Mandatory,ValueFromPipeline,
-        ParameterSetName='ErrorRecord',
-        HelpMessage = "Error record"
-    )]
-    [Management.Automation.ErrorRecord[]]$ErrorRecord,
+[Parameter(
+    Mandatory,ValueFromPipeline,
+    ParameterSetName='ErrorRecord',
+    HelpMessage = "Error record"
+)]
+[Management.Automation.ErrorRecord[]]$ErrorRecord,
 
-    [Parameter(
-        Mandatory,ValueFromPipeline,
-        ParameterSetName='StopException',
-        HelpMessage = "A special stop exception raised by cmdlets with -ErrorAction Stop"
-    )]
-    [Management.Automation.ActionPreferenceStopException[]]$Exception
+[Parameter(
+    Mandatory,ValueFromPipeline,
+    ParameterSetName='StopException',
+    HelpMessage = "A special stop exception raised by cmdlets with -ErrorAction Stop"
+)]
+[Management.Automation.ActionPreferenceStopException[]]$Exception
 
-  )
-
-
-  process {
+)
+process {
 
     # If we received a stop exception in $Exception, the error record is to be found inside of it
     # In all other cases, $ErrorRecord was received directly
@@ -59,7 +57,7 @@ function ConvertFrom-ErrorRecord {
         Script    = $_.InvocationInfo.ScriptName
         Line      = $_.InvocationInfo.ScriptLineNumber
         Column    = $_.InvocationInfo.OffsetInLine
-      }
+        }
     }
 }
 
