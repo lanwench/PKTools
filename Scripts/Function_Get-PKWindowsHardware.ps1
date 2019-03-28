@@ -10,7 +10,7 @@ Function Get-PKWindowsHardware {
     Returns a PSobject or PSJob
 
 .NOTES        
-    Name    : Function_Do-Somethingcool.ps1
+    Name    : Function_Get-PKWindowsHardware.ps1
     Created : 2019-03-08
     Author  : Paula Kingsley
     Version : 01.00.0000
@@ -231,19 +231,89 @@ Begin {
     #region Functions
 
     Function Test-WinRM{
-        Param($Computer)
+        [Cmdletbinding()]
+        Param($Computer,$Credential,$Authentication,[switch]$Quiet)
+        
         $Param_WSMAN = @{
             ComputerName   = $Computer
-            Credential     = $Credential
-            Authentication = "Kerberos"
+            Authentication = $Authentication
             ErrorAction    = "Silentlycontinue"
-            Verbose        = $False
+            Verbose        = $VerbosePreference
+            ErrorVariable  = "Nope"
         }
-        Try {
-            If (Test-WSMan @Param_WSMAN) {$True}
-            Else {$False}
+        If ($Computer -notmatch "\.") {
+            Try {
+                If (-not ($Target = [System.Net.Dns]::GetHostByName($Computer).Hostname)) {
+                    $Msg = "Failed to resolve name '$Computer' to FQDN"
+                    If ($Quiet.IsPresent) {
+                        Write-Warning $Msg
+                        $False
+                    }
+                    Else {
+                        $Host.UI.WriteErrorLine($Msg)
+                    }
+                }
+                Else {
+                    $Msg = "Resolved computername to '$Target'"
+                    If (-not $Quiet.IsPresent) {
+                        Write-Output $Msg
+                    }
+                    Else {
+                        Write-Verbose $Msg
+                    }
+                }
+            }
+            Catch {
+                $Msg = "Failed to resolve name '$Computer' to FQDN"
+                If ($Quiet.IsPresent) {
+                    Write-Verbose $Msg
+                    $False
+                }
+                Else {
+                    $Host.UI.WriteErrorLine($Msg)
+                }
+            }
         }
-        Catch {$False}
+        
+        If ($Target) {
+            $Param_WSMAN.ComputerName = $Target
+            If ($PSBoundParameters.Credential.UserName) {
+                $Param_WSMAN.Add("Credential",$Credential)
+            }
+            Try {
+                $TestWinRM = Test-WSMan @Param_WSMAN
+                If (Test-WSMan @Param_WSMAN) {
+                    $Msg = "Successfully connected to '$Target' via WinRM using '$Authentication' authentication"
+                    If ($Quiet.IsPresent) {
+                        Write-Verbose $Msg
+                        $True
+                    }
+                    Else {
+                        Write-Output $Msg
+                    }
+                }
+                Else {
+                    $Msg = [regex]:: match($Nope,'(?<=\<f\:Message\>).+(?=\<\/f\:Message\>)',"singleline").value.trim()
+                    If ($Quiet.IsPresent) {
+                        Write-Verbose $Msg
+                        $False
+                    }
+                    Else {
+                        $Host.UI.WriteErrorLine($Msg)
+                    }
+                }
+            }
+            Catch {
+                $Msg = "Failed to connect to '$Target' via WinRM using '$Authentication' authentication"
+                If ($Quiet.IsPresent) {
+                    Write-Verbose $Msg
+                    $False
+                }
+                Else {
+                    $Host.UI.WriteErrorLine($Msg)
+                }
+            }
+        }
     }
 
     Function Test-Ping{
@@ -274,6 +344,15 @@ Begin {
         Activity         = $Activity
         CurrentOperation = $Null
         Status           = "Working"
+        PercentComplete  = $Null
+    }
+
+    $Param_WinRM = @{}
+    $Param_WinRM = @{
+        Computer = $Null
+        
+        Verbose = $False
+
         PercentComplete  = $Null
     }
 

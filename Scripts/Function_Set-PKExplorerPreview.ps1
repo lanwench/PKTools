@@ -10,14 +10,15 @@ Function Set-PKExplorerPreview {
             
 .NOTES
     Name    : Function_Set-PKExplorerPreview.ps1
-    Version : 1.0.0
     Author  : Paula Kingsley
     Created : 2017-08-22
+    Version : v01.01.0000
     History:
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK
 
-        v1.0.0 - 2017-08-22 - Created script
+        v1.0.0      - 2017-08-22 - Created script
+        v01.01.0000 - 2019-03-11 - Fixed erroneous Win10 message, other general updates
         
 .LINK
     https://blogs.technet.microsoft.com/bshukla/2010/03/30/script-to-enable-preview-pane-for-powershell-scripts/
@@ -71,21 +72,30 @@ Param(
         HelpMessage = "File extension (e.g., 'txt' or '.txt')"
     )]
     [ValidateNotNullOrEmpty()]
-    [string[]]$FileExtension
+    [string[]]$FileExtension,
 
+    [Parameter(
+        HelpMessage = "Don't test Windows version before running script"
+    )]
+    [switch]$SkipOSVersionCheck,
+
+    [Parameter(
+        HelpMessage = "Force registry change"
+    )]
+    [switch]$Force,
+
+    [Parameter(
+        HelpMessage = "Suppress all non-verbose/non-error output"
+    )]
+    [switch]$SuppressConsoleOutput
 )
 
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "1.0.0"
-
-    # Preference
-    $ErrorActionPreference = "Stop"
-    $ProgressPreference = "Continue"
+    [version]$Version = "01.01.0000"
 
     
-
     # Show our settings
     $CurrentParams = $PSBoundParameters
     $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
@@ -97,6 +107,10 @@ Begin {
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n `t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
+    # Preference
+    $ErrorActionPreference = "Stop"
+    $ProgressPreference = "Continue"
+
     # General-purpose splat
     $StdParams = @{}
     $StdParams = @{
@@ -104,6 +118,9 @@ Begin {
         Verbose = $False
     }
     
+
+    #region Inner functions
+
     # Function to check if PowerShell is running in elevated mode
     function Test-Elevated{
         [CmdletBinding()]
@@ -117,32 +134,49 @@ Begin {
             $True
         }
         Else {
-            $Msg = "PowerShell must be running in Elevated mode; please re-launch as Administrator"
-            $Host.UI.WriteErrorLine("ERROR: $Msg")
+            #$Msg = "PowerShell must be running in Elevated mode; please re-launch as Administrator"
+            $Msg = "PowerShell is not running in Elevated mode"
+            #$Host.UI.WriteErrorLine("ERROR: $Msg")
+            Write-Warning $Msg
             $False
         }
     }
 
+    #endregion Inner functions
+
+
+    #region Prerequisites
+
+    $Msg = "Checking OS version compatibility"    
+        Write-Verbose "[Prerequisites] $Msg"
+    If (-not (Test-Elevated -Verbose:$False)) {
+        $Msg = "PowerShell must be running in Elevated mode; please re-launch as Administrator"
+
+    }
+
+    [Switch]$Continue = $False
     If (-not $SkipOSVersionCheck.IsPresent) {
         $Msg = "Checking OS version compatibility"    
-        Write-Verbose $Msg
+        Write-Verbose "[Prerequisites] $Msg"
         
         Try {
             $OS = (Get-WmiObject -Class win32_OperatingSystem @StdParams).caption
             switch -wildcard ($OS){
                 "*Windows 7*" {
                     $Msg = "Verified OS $OS"
-                    Write-Verbose $Msg
+                    Write-Verbose "[Prerequisites] $Msg"
                     $Null = Test-Elevated
+                    $Continue = $True
                 }
                 "*Windows Server 2008 R2*" {
                     $Msg = "Verified OS $OS"
-                    Write-Verbose $Msg
+                    Write-Verbose "[Prerequisites] $Msg"
                     $Null = Test-Elevated
+                    $Continue = $True
                 }
                 default {
-                    $Msg = "You are running $OS. This function requires Windows 7 or Windows Server 2008 R2. "
-                    $Host.UI.WriteErrorLine("ERROR: $Msg")
+                    $Msg = "$Env:ComputerName is running $OS. This function requires Windows 7 or Windows Server 2008 R2. "
+                    $Host.UI.WriteErrorLine("ERROR  : [Prerequisites] $Msg")
                     Break
                 }
             }
@@ -154,15 +188,58 @@ Begin {
             Break
         }
     }
+    Else {$Continue = $True}
+
+    If (-not $Continue.IsPresent) {
+        Break
+    }
+
+    #endregion Prerequisites
 
     $Msg = "This script tells Windows to treat the specified file extension as a text file,`nallowing it to be viewed in the Windows Explorer preview pane.`nIt does not verify that the file type is compatible with this setting; please proceed with caution!"
     Write-Warning $Msg
-    $Host.UI.WriteLine()
+    
+    $Activity = "Enable Windows Explorer preview pane to view file extensions"   
+    $Msg = "BEGIN  : $Activity"
+    $BGColor    = $Host.UI.RawUI.BackgroundColor
+    $FGColor = "Yellow"
+    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
+    Else {Write-Verbose $Msg}
 
 }
 
 Process {
     
+    $Total = $FileExtension.Count
+    $Current = 0
+
+    Foreach ($Ext in $FileExtension) {
+        
+        If ($Ext -match "^.") {$Ext = $Ext.Replace(".",$Null)}
+
+        $Current ++
+        $Msg = "Check registry for current settings"
+        Write-Verbose "[.$Ext] $Msg"
+        Write-Progress -Activity $Activity -CurrentOperation $Msg -Status ".$Ext" -PercentComplete ($Current/$Total * 100)
+
+
+        If ($GetReg = Get-ItemProperty -Path "Registry::HKEY_CLASSES_ROOT\.$Ext" -Verbose:$False -ErrorAction SilentlyContinue) {
+            
+            If ($GetReg.PerceivedType -eq "Text") {
+                $Msg = "Extension is already set for Windows Explorer preview"
+                Write-Warning "[.$Ext] $Msg"
+            }
+            Else {
+                $Msg = ""
+                Write-Warning "[.$Ext] $Msg"
+            }
+        }
+
+
+
+    }
+
+    <#
     Foreach ($REG_KEY in $FileExtension) {
 
         Try {
@@ -175,7 +252,8 @@ Process {
             [switch]$Change = $False
 
 	        # Open registry
-	        $reg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('ClassesRoot', ".")
+	        #$reg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('ClassesRoot', ".")
+            $reg = [Microsoft.Win32.RegistryKey]::OpenBaseKey('ClassesRoot', ".")
 	
             # Open the targeted remote registry key/subkey as read/write
             $Msg = "Open registry key/subkey for $REG_KEY as read/write"
@@ -245,6 +323,8 @@ Process {
     
         }
     } #end foreach
+
+    #>
 }
 
 End {}

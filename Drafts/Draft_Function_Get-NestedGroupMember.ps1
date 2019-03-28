@@ -33,7 +33,7 @@ process{
 }
  
 # make sure you specify a valid distinguishedname for a user below 
-#Get-NestedGroupMember -distinguishedName 'CN=Paula Kingsley,OU=Emeryville,OU=Full Time Employees,OU=All Users,OU=Gracenote,OU=Production,DC=gracenote,DC=gracenote,DC=com'
+#Get-NestedGroupMember -distinguishedName 'CN=Joe Bloggs,OU=Admins,DC=domain,DC=local'
 
 
 

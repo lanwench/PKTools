@@ -15,13 +15,14 @@ Function Get-PKADOrganizationalUnit {
 .NOTES
     Name    : Function_Get-PKADOrganizationalUnit
     Created : 2017-10-10
-    Version : 01.00.0000
+    Version : 01.01.0000
     Author  : Paula Kingsley
     History :
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK
 
         v01.00.0000 - 2017-10-10 - Created script
+        v01.01.0000 - 2019-03-26 - Minor updates
 
 .PARAMETER BaseDN
     Top-level searchbase in domain (distinguishedname format, e.g., 'DC=domain,DC=local')
@@ -74,18 +75,16 @@ Function Get-PKADOrganizationalUnit {
         ScriptName     Get-PKADOrganizationalUnit      
         ScriptVersion  1.0.0                           
 
-
-
         VERBOSE: Verify DC=domain,DC=local
         VERBOSE: Search for Organizational Units
         VERBOSE: Create menu
         VERBOSE: 3 selection(s) made
 
-        CanonicalName                                                               DistinguishedName                                                
-        -------------                                                               -----------------                                                
-        domain.local/Production/Gracenote/All Groups/Deployment Groups   OU=Deployment Groups,OU=All Groups,OU=Gracenote,OU=Production,...
-        domain.local/Production/Gracenote/All Groups/Distribution Groups OU=Distribution Groups,OU=All Groups,OU=Gracenote,OU=Productio...
-        domain.local/Production/Gracenote/All Groups/Security Groups     OU=Security Groups,OU=All Groups,OU=Gracenote,OU=Production,DC...
+        CanonicalName                                          DistinguishedName                                                
+        -------------                                          -----------------                                                
+        domain.local/Production/All Groups/Deployment Groups   OU=Deployment Groups,OU=All Groups,OU=Production,...
+        domain.local/Production/All Groups/Distribution Groups OU=Distribution Groups,OU=All Groups,OU=Productio...
+        domain.local/Production/All Groups/Security Groups     OU=Security Groups,OU=All Groups,OU=Production,DC...
 
 
 
@@ -147,12 +146,13 @@ Function Get-PKADOrganizationalUnit {
          HelpMessage = "Suppress any non-verbose/non-error console output"
      )]
      [ValidateNotNullOrEmpty()]
-     [switch]$SuppressConsoleOutput
+     [Alias("SuppressConsoleOutput")]
+     [switch]$Quiet
  )
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01.0000"
 
     # Show our settings
     $CurrentParams = $PSBoundParameters
@@ -181,9 +181,9 @@ Begin {
 
     # Console output
     $BGColor = $host.UI.RawUI.BackgroundColor
-    $Msg = "Action: $Activity"
+    $Msg = "BEGIN  : $Activity"
     $FGColor = "Yellow"
-    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
+    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"`n$Msg`n")}
     Else {Write-Verbose $Msg}
 }
 
@@ -260,5 +260,10 @@ Process {
 }
 End {
     Write-Progress -Activity $Activity -Completed
+
+    $Msg = "END    : $Activity"
+    $FGColor = "Yellow"
+    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
+    Else {Write-Verbose $Msg}
 }
 } #end Get-PKADOrganizationalUnit

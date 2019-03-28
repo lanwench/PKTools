@@ -16,12 +16,13 @@ Function Get-PKWindowsRegistryDN {
     Name    : Function_Get-PKWindowsRegistryDN.ps1
     Created : 2018-01-23
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01.0000
     History :
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
         
         v01.00.0000 - 2018-01-23 - Created script
+        v01.01.0000 - 2019-03-26 - Minor updates
 
 .PARAMETER ComputerName
     Name of target computer (separate multiple names with commas)
@@ -35,7 +36,7 @@ Function Get-PKWindowsRegistryDN {
 .PARAMETER SkipConnectionTest
     Don't test WinRM connectivity before submitting command (skipped anway if local computer)
 
-.PARAMETER SuppressConsoleOutput
+.PARAMETER Quiet
     Hide all non-verbose/non-error console output
 
 .EXAMPLE
@@ -89,7 +90,7 @@ Function Get-PKWindowsRegistryDN {
         WORKSTATION17  CN=WORKSTATION17,OU=Seattle,OU=Workstations,OU=Computers,OU=Production,DC=domain,DC=local
         SQLDEV         CN=SQLDEV,OU=Seattle,OU=Workstations,OU=Computers,OU=Production,DC=domain,DC=local
         WEBCONSOLE-BU  CN=WEBCONSOLE-BU,OU=Indiana,OU=Servers,OU=Computers,OU=Production,DC=domain,DC...
-        FRONT-DESK     CN=FRONT-DESK,OU=DeployO365,OU=Emeryville,OU=Workstations,OU=Computers,OU=Gracenote,OU=Produc...
+        FRONT-DESK     CN=FRONT-DESK,OU=DeployO365,OU=Emeryville,OU=Workstations,OU=Computers,OU=Produc...
         WORKSTATION11  CN=WORKSTATION11,OU=StLouis,OU=Workstations,OU=Computers,OU=Production,DC=local,DC=com  
         JBBILO         CN=JBBILO,OU=Contractors,OU=Emeryville,OU=Workstations,OU=Computers,OU=Production,DC=domain,DC...
         
@@ -137,7 +138,8 @@ Param (
         Mandatory=$False,
         HelpMessage="Hide all non-verbose/non-error console output"
     )]
-    [Switch] $SuppressConsoleOutput
+    [Alias("SuppressConsoleOutput")]
+    [Switch] $Quiet
 
 )
 
@@ -145,7 +147,7 @@ Param (
 Begin { 
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01.0000"
 
     # Detect pipeline input
     $PipelineInput = (-not $PSBoundParameters.ContainsKey("ComputerName")) -and ((-not $ComputerName)) # -or (-not $InputObj -eq $Env:ComputerName))
@@ -178,10 +180,13 @@ Begin {
         Verbose     = $False
     }
 
+    #Output
     $Results = @()
     
+    #region Scriptblock
+
     # Scriptblock for invoke-command
-    $SCriptBlock = {
+    $ScriptBlock = {
         
         $ErrorActionPreference = "Stop"
         $InitialValue = "Error"
@@ -202,6 +207,8 @@ Begin {
         Write-Output ($Output | Select-Object $Select)
 
     } #end scriptblock
+
+    #endregion Scriptblock
 
     #region Splats
 
@@ -251,9 +258,9 @@ Begin {
 
     # Console output
     $BGColor = $host.UI.RawUI.BackgroundColor
-    $Msg = "Action: $Activity"
+    $Msg = "BEGIN  : $Activity"
     $FGColor = "Yellow"
-    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
+    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
     Else {Write-Verbose $Msg}
 
 
@@ -269,8 +276,7 @@ Process {
         
         $Computer = $Computer.Trim()
         $Msg = $Computer
-        Write-Verbose $Msg
-
+        
         $Current ++ 
 
         [int]$percentComplete = ($Current/$Total* 100)
@@ -287,7 +293,7 @@ Process {
             If (-not ($Computer -match "Localhost|$Env:ComputerName|127.0.0.1|")) {
 
                 $Msg = "Test WinRM connection"
-                Write-Verbose $Msg
+                Write-Verbose "[$Computer] $Msg"
 
                 If ($PSCmdlet.ShouldProcess($Computer,$Msg)) {
 
@@ -296,14 +302,14 @@ Process {
                         $Continue = $True
                     }
                     Else {
-                        $Msg = "WinRM connection failed on $Computer"
-                        If ($ErrorDetails = [regex]:: match($_.Exception.Message,'(?<=\<f\:Message\>).+(?=\<\/f\:Message\>)',"singleline").value.trim()) {$Msg = "$Msg`n$ErrorDetails"}
-                        $Host.UI.WriteErrorLine("ERROR: $Msg")
+                        $Msg = "WinRM connection failed"
+                        If ($ErrorDetails = [regex]:: match($_.Exception.Message,'(?<=\<f\:Message\>).+(?=\<\/f\:Message\>)',"singleline").value.trim()) {$Msg += "`n$ErrorDetails"}
+                        $Host.UI.WriteErrorLine("ERROR: [$Computer] $Msg")
                     }
                 }
                 Else {
-                    $Msg = "WinRM connection test cancelled by user on $Computer"
-                    $Host.UI.WriteErrorLine("$Msg on $Computer")
+                    $Msg = "WinRM connection test cancelled by user"
+                    Write-Verbose "[$Computer] $Msg"
                 }
             }
             Else {
@@ -316,6 +322,9 @@ Process {
         
         If ($Continue.IsPresent) {
             
+            $Msg = "Invoke command"
+            Write-Verbose "[$Computer] $Msg"
+
             If ($PSCmdlet.ShouldProcess($Computer,$Activity)) {
                 
                 Try {
@@ -325,22 +334,23 @@ Process {
                         $Param_IC.JobName = "$JobPrefix`_$Computer"
                         $Job = Invoke-Command @Param_IC 
                         $Msg = "Job ID $($Job.ID): $($Job.Name)"
-                        Write-Verbose $Msg
+                        Write-Verbose "[$Computer] $Msg"
+                        Write-Output $Job
                         $Jobs += $Job
                     }
                     Else {
-                        $Results += Invoke-Command @Param_IC
+                        Invoke-Command @Param_IC
                     }
                 }
                 Catch {
-                    $Msg = "Operation failed on $Computer"
-                    If ($ErrorDetails = $_.Exception.Message) {$Msg = "$Msg`n$ErrorDetails"}
-                    $Host.UI.WriteErrorLine("ERROR: $Msg")
+                    $Msg = "Operation failed "
+                    If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
+                    $Host.UI.WriteErrorLine("ERROR: [$Computer] $Msg")
                 }
             }
             Else {
-                $Msg = "Operation cancelled by user on $Computer"
-                $Host.UI.WriteErrorLine($Msg)
+                $Msg = "Operation cancelled by user"
+                Write-Verbose "[$Computer] $Msg"
             }
         
         } #end if proceeding with script
@@ -355,24 +365,19 @@ End {
      If ($AsJob.IsPresent) {
         If ($Jobs.Count -gt 0) {
             $Msg = "$($Jobs.Count) job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output"
-            Write-Verbose $Msg
+            Write-Verbose "[$Computer] $Msg"
             $Jobs | Get-Job   
         }
         Else {
             $Msg = "No jobs created"
-            $Host.UI.WriteErrorLine($Msg)
+            Write-Warning "[$Computer] $Msg"
         }
     } #end if AsJob
 
-    Else {
-        If ($Results.Count -eq 0) {
-            $Msg = "No results found"
-            $Host.UI.WriteErrorLine($Msg)
-        }
-        Else {
-            Write-Output ($Results | Select -Property * -ExcludeProperty PSComputerName,RunspaceID)
-        }
-    }
+    $Msg = "END    : $Activity"
+    $FGColor = "Yellow"
+    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
+    Else {Write-Verbose $Msg}
 }
 
 } # end Get-PKWindowsRegistryDN

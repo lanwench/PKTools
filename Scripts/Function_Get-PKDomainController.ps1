@@ -1,8 +1,7 @@
 ﻿#requires -Version 3
 Function Get-PKADDomainController {
 <#
-
-.Synopsis
+.SYNOPSIS
     Returns a domain controller for the current computer site or a named site in the current or named domain
     
 .DESCRIPTION
@@ -14,14 +13,14 @@ Function Get-PKADDomainController {
 .NOTES
     Name    : Function_Get-PKADDomainController.ps1
     Created : 2017-09-15
-    Version : 01.00.0000
     Author  : Paula Kingsley
-    
+    Version : 01.01.0000
     History:
 
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK *
 
         v01.00.0000 - 2017-09-15 - Created script
+        v01.01.0000 - 2019-03-26 - General cosmetic udates
         
 .EXAMPLE
     PS C:\> Get-PKDomainController -Verbose
@@ -69,35 +68,33 @@ Function Get-PKADDomainController {
         ---           -----                  
         ADSite        Sacramento             
         Verbose       True                   
-        ADDomain      gracenote.gracenote.com
+        ADDomain      domain.local
         ScriptName    Get-PKDomainController 
         ScriptVersion 1.0.0                  
 
-
-
         VERBOSE: Get domain details
-        VERBOSE: Domain 'gracenote.gracenote.com' is running in Windows2008R2Domain mode in forest 'gracenote.gracenote.com'
+        VERBOSE: Domain 'domain.local' is running in Windows2008R2Domain mode in forest 'domain.local'
         VERBOSE: Get site
         VERBOSE: Current site is 'Sacramento'
         VERBOSE: Get domain controller in site
-        VERBOSE: Found domain controller 'SACDC01.gracenote.gracenote.com'
+        VERBOSE: Found domain controller 'DC04.domain.local'
 
 
-        Forest                     : gracenote.gracenote.com
+        Forest                     : domain.local
         CurrentTime                : 2017-09-15 20:51:56
         HighestCommittedUsn        : 588463910
         OSVersion                  : Windows Server 2008 R2 Enterprise
         Roles                      : {SchemaRole, NamingRole, PdcRole, RidRole...}
-        Domain                     : gracenote.gracenote.com
+        Domain                     : domain.local
         IPAddress                  : 10.8.142.103
         SiteName                   : Sacramento
         SyncFromAllServersCallback : 
         InboundConnections         : {6ba69348-a596-4f09-b1a4-652e44b6fea0, EVLDC00, GFDC01, SCDC03}
         OutboundConnections        : {198b36d4-2bbb-4e76-9079-e9cc53c9196f}
-        Name                       : SACDC01.gracenote.gracenote.com
-        Partitions                 : {DC=gracenote,DC=gracenote,DC=com, CN=Configuration,DC=gracenote,DC=gracenote,DC=com, 
-                                     CN=Schema,CN=Configuration,DC=gracenote,DC=gracenote,DC=com, 
-                                     DC=DomainDnsZones,DC=gracenote,DC=gracenote,DC=com...}
+        Name                       : DC04.domain.local
+        Partitions                 : {DC=domain,DC=local, CN=Configuration,DC=domain,DC=local, 
+                                     CN=Schema,CN=Configuration,DC=domain,DC=local, 
+                                     DC=DomainDnsZones,DC=domain,DC=local...}
 
 
 
@@ -105,25 +102,31 @@ Function Get-PKADDomainController {
 [CmdletBinding()]
 Param (
     [Parameter(
-        Mandatory = $False,
-        HelpMessage = "AD domain name FQDN (default is current computer)"
+        ValueFromPipeline = $True,
+        HelpMessage = "Active Directory object, name or FQDN (default is current user)"
     )]
     [ValidateNotNullOrEmpty()]
-    [string]$ADDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetComputerDomain(),
+    [object]$ADDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain(),
+    
+    [Parameter(
+        ParameterSetName = "BySite",
+        HelpMessage = "AD site (default is all)"
+    )]
+    [ValidateNotNullOrEmpty()]
+    [string]$ADSite, # = [System.DirectoryServices.ActiveDirectory.ActiveDirectorysite]::GetComputerSite(),
 
     [Parameter(
-        Mandatory = $False,
-        HelpMessage = "AD site (default is current computer)"
+        HelpMessage ="Suppress all non-verbose/non-error console output"
     )]
-    [ValidateNotNullOrEmpty()]
-    [string]$ADSite = [System.DirectoryServices.ActiveDirectory.ActiveDirectorysite]::GetComputerSite()
+    [Alias("SuppressConsoleOutput")]
+    [Switch] $Quiet
 
 )
 Begin {
 
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01.0000"
 
     # Show our settings
     $CurrentParams = $PSBoundParameters
@@ -138,14 +141,103 @@ Begin {
     # Preference
     $ErrorActionPreference = "Stop"
 
+    #region Functions
+
+    # Get forest
+    Function GetDomain {
+        [CmdletBinding()]
+        Param($DomainName,$Credential)
+        Try {
+            $ContextType = [System.DirectoryServices.ActiveDirectory.DirectoryContextType]'Domain' 
+            If ($Credential) {
+                $UserName = $Credential.Username
+                $Password = $Credential.GetNetworkCredential().Password
+                If ($Username -match "\\") {$Username = $Username.Split("\")[1]}
+                Elseif ($Username -match "@") {$Username = $Username.Split("@")[0]}
+                $Context = New-Object System.DirectoryServices.ActiveDirectory.DirectoryContext($ContextType,$DomainName,$UserName,$Password)
+            }
+            Else {
+                $Context = new-object System.DirectoryServices.ActiveDirectory.DirectoryContext($ContextType,$DomainName)
+            }
+            [System.DirectoryServices.ActiveDirectory.Domain]::GetDomain($Context)
+        }
+        Catch {}
+    }
+
+    # Get forest
+    Function GetForest {
+        [CmdletBinding()]
+        Param($ADDomain)
+        Try {
+            $ContextType = [System.DirectoryServices.ActiveDirectory.DirectoryContextType]'Forest' 
+            New-Object System.DirectoryServices.ActiveDirectory.DirectoryContext($ContextType,$ADDomain.Forest) 
+            }
+        Catch {}
+    }
+
+    # Get sites
+    Function GetSite {
+        [CmdletBinding()]
+        Param($Forest,$SiteName)
+        Try {
+            $AllSites = [System.DirectoryServices.ActiveDirectory.Forest]::GetForest($Forest).sites
+            If ($SiteName) {
+                $AllSites | Where-Object {$_.Name -eq $SiteName}
+            }
+            Else {$AllSites}
+        }
+        Catch {}
+    }
+
+    #endregion Functions
+
+    # Get domain
+    If ($ADDomain.GetType().Name -eq "String") {
+        $Msg = "Get Active Directory domain"
+        Write-Verbose "[Prerequisites] $Msg"
+        
+        # https://social.technet.microsoft.com/Forums/en-US/c771e6bf-5134-4d25-8cef-8b4f9a136627/binding-to-ad?forum=ITCG
+        
+        $ADDomain = GetDomain -DomainName $ADDomain -Credential $Credential
+    }    
+    
+    # Get forest
+    $ADForest= GetForest -ADDomain $ADDomain
+
+
+    # Get sites
+    $ADSites = GetSite -Forest $ADForest
+
+
+
+    #region Splats
+
+    # Splat for Write-Progress
+    $Activity = "Get Active Directory domain controllers using .NET"
+    $Param_WP = @{}
+    $Param_WP = @{
+        Activity         = $Activity
+        CurrentOperation = $Null
+        Status           = "Working"
+    }
+
+    #endregion Splats
+
+    # Console output
+    $BGColor = $host.UI.RawUI.BackgroundColor
+    $Msg = "BEGIN  : $Activity"
+    $FGColor = "Yellow"
+    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"$Msg")}
+    Else {Write-Verbose $Msg}
+
 }
 
 Process {
     
-    $Msg = "Get domain details"
-    Write-Verbose $Msg
+    [switch]$Continue = $False
 
-    $Activity = "Get domain controller in site"
+    $Msg = "Get Active Directory domain"
+    Write-Verbose "[$ADDomain] $Msg"
     $CurrentOperation = $Msg
     Write-Progress -Activity $Activity -CurrentOperation $CurrentOperation
 
@@ -155,81 +247,96 @@ Process {
         $DomainObj = [System.DirectoryServices.ActiveDirectory.Domain]::GetDomain($Context)
             
         $Msg = "Domain '$($DomainObj.Name)' is running in $($DomainObj.DomainMode) mode in forest '$($DomainObj.Forest)'"
-        Write-Verbose $Msg
+        Write-Verbose "[$ADDomain] $Msg"
+        $Continue= $True
 
     }
     Catch {
-        $Msg = "Operation failed for domain '$ADDomain'"
-        $ErrorDetails = ($_.Exception.Message.Split(':')[1]).Trim().Replace('"','').Replace('.','')
-        $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
+        $Msg = "Operation failed"
+        If ($ErrorDetails = ($_.Exception.Message.Split(':')[1]).Trim().Replace('"','').Replace('.','')) {$Msg += "`n$ErrorDetails"}
+        $Host.UI.WriteErrorLine("ERROR  : [$ADDomain] $Msg")
         Break
-    }
-        
-
-    $Msg = "Get site"
-    Write-Verbose $Msg
-    $CurrentOperation = $Msg
-    Write-Progress -Activity $Activity -CurrentOperation $CurrentOperation
-
-    Try {
-        $SiteContext = new-object System.DirectoryServices.ActiveDirectory.DirectoryContext("Forest", $DomainObj.Forest)
-        If (-not ($SiteObj = [System.DirectoryServices.ActiveDirectory.Forest]::GetForest($SiteContext).sites | Where-Object {$_.Name -eq $ADSite})){
-            $Msg = "Invalid AD site '$ADSite"
-            $Host.UI.WriteErrorLine("ERROR: $Msg")
-            Break
-        }
-        Else {
-            $SiteName = $SiteObj.Name
-            $Msg = "Current site is '$SiteName'"
-            Write-Verbose $Msg
-        }
-    }
-    Catch {
-        $Msg = "Operation failed for site '$ADSite'"
-        $ErrorDetails = ($_.Exception.Message.Split(':')[1]).Trim().Replace('"','').Replace('.','')
-        $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
-        Break
-            
     }
     
-    $Msg = "Get domain controller in site"
-    Write-Verbose $Msg
-    $CurrentOperation = $Msg
-    Write-Progress -Activity $Activity -CurrentOperation $CurrentOperation
+    If ($Continue.IsPresent) {
+    
+        # reset flag
+        $Continue = $False    
 
-    Try {
-        If (-not ($DC = $DomainObj.DomainControllers | Where-Object {$_.SiteName -eq $SiteName} | Select -first 1)) {
-            $Msg = "Failed to get domain controller for '$SiteName'; check connected sites"
-            Write-Warning $Msg
-            $SiteObj.AdjacentSites | Foreach-Object {
-                $SiteName = $_.Name
-                If (-not ($DC = $DomainObj.DomainControllers | Where-Object {$_.SiteName -eq $SiteName} | Select -first 1)) {
-                    $Msg = "Failed to get domain controller for '$SiteName'; select first DC in domain"
-                    Write-Warning $Msg
-                    $DC = $DomainObj.DomainControllers[0]
-                }
-            } #end foreach adjacent site
-        } # end get DC in site
+        $Msg = "Get Active Directory site"
+        Write-Verbose "[$ADDomain] $Msg"
+        $CurrentOperation = $Msg
+        Write-Progress -Activity $Activity -CurrentOperation $CurrentOperation
 
-        If ($DC) {
-            $Msg = "Found domain controller '$($DC.Name)'"
-            Write-Verbose $Msg
-            Write-Output $DC
+        Try {
+            $SiteContext = new-object System.DirectoryServices.ActiveDirectory.DirectoryContext("Forest", $DomainObj.Forest)
+            If (-not ($SiteObj = [System.DirectoryServices.ActiveDirectory.Forest]::GetForest($SiteContext).sites | Where-Object {$_.Name -eq $ADSite})){
+                $Msg = "Invalid AD site '$ADSite"
+                $Host.UI.WriteErrorLine("ERROR  : [$ADDomain] $Msg")
+            }
+            Else {
+                $SiteName = $SiteObj.Name
+                $Msg = "Current site is '$SiteName'"
+                Write-Verbose "[$ADDomain] $Msg"
+                $Continue = $True
+            }
         }
-        Else {
-            $Msg = "No domain controller found"
-            $Host.UI.WriteErrorLine("ERROR: $Msg")
-        }       
+        Catch {
+            $Msg = "Operation failed for site '$ADSite'"
+            If ($ErrorDetails = ($_.Exception.Message.Split(':')[1]).Trim().Replace('"','').Replace('.','')) {$Msg += "`n$ErrorDetails"}
+            $Host.UI.WriteErrorLine("ERROR  : [$ADDomain] $Msg")
+               
+        }
     }
-    Catch {
-        $Msg = "Domain controller lookup failed"
-        $ErrorDetails = $_.Exception.Message
-        $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
-    }
+    
+    If ($Continue.IsPresent) {
+    
+        # reset flag
+        $Continue = $False    
 
+        $Msg = "Get Get Active Directory domain controller(s) in site"
+        Write-Verbose "[$ADDomain] $Msg"
+        $CurrentOperation = $Msg
+        Write-Progress -Activity $Activity -CurrentOperation $CurrentOperation
+
+        Try {
+            If (-not ($DC = $DomainObj.DomainControllers | Where-Object {$_.SiteName -eq $SiteName} | Select -first 1)) {
+                $Msg = "Failed to get domain controller for '$SiteName'; check connected sites"
+                Write-Warning $Msg
+                $SiteObj.AdjacentSites | Foreach-Object {
+                    $SiteName = $_.Name
+                    If (-not ($DC = $DomainObj.DomainControllers | Where-Object {$_.SiteName -eq $SiteName} | Select -first 1)) {
+                        $Msg = "Failed to get domain controller for '$SiteName'; select first DC in domain"
+                        Write-Warning "[$ADDomain] $Msg"
+                        $DC = $DomainObj.DomainControllers[0]
+                    }
+                } #end foreach adjacent site
+            } # end get DC in site
+
+            If ($DC) {
+                $Msg = "Found domain controller '$($DC.Name)'"
+                Write-Verbose "[$ADDomain] $Msg"
+                Write-Output $DC
+            }
+            Else {
+                $Msg = "No domain controller found"
+                $Host.UI.WriteErrorLine("ERROR  : [$ADDomain] $Msg")
+            }       
+        }
+        Catch {
+            $Msg = "Domain controller lookup failed"
+            If ($ErrorDetails = ($_.Exception.Message.Split(':')[1]).Trim().Replace('"','').Replace('.','')) {$Msg += "`n$ErrorDetails"}
+            $Host.UI.WriteErrorLine("ERROR  : [$ADDomain] $Msg")
+        }
+    }
+    
+}
+End {
+    
     Write-Progress -Activity $Activity -Completed
 }
 } #end Get-PKADDomainController
+
 
 
 
