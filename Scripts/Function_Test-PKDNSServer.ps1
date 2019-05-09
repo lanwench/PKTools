@@ -45,7 +45,7 @@ Function Test-PKDNSServer {
     Timeout for ping / TCP connection tests, between 1 millisecond and 30 seconds (default is 5 seconds; ignored if -ConnectionTests is 'None')
 
 .PARAMETER Quiet
-    Suppress non-verbose/non-error console output
+    Suppress non-verbose console output
 
 .EXAMPLE
     
@@ -56,15 +56,17 @@ Function Test-PKDNSServer {
 )]
 Param(
     [Parameter(
+        Position = 0,
         ValueFromPipeline = $True,
         ValueFromPipelineByPropertyName = $True,
         HelpMessage = "DNS server name or IP (default is local)"
     )]
     [ValidateNotNullOrEmpty()]
-    [Alias("Nameserver","DNSServer","IPAddress","IPv4Address")]
+    [Alias("Nameserver","DNSServer","IPAddress","IPv4Address","HostName")]
     [string[]]$Server,
     
     [Parameter(
+        Position = 1,
         HelpMessage = "Name or IP for DNS lookup (default is microsoft.com)"
     )]
     [ValidateNotNullOrEmpty()]
@@ -83,9 +85,16 @@ Param(
     [Switch]$NoRecursion,
 
     [Parameter(
+        ParameterSetName = "Lookup",
         HelpMessage = "Include lookup data in output object"
     )]
     [Switch]$ReturnLookupData,
+
+    [Parameter(
+        ParameterSetName = "Lookup",
+        HelpMessage = "Truncate lookup data if returning"
+    )]
+    [switch]$TruncateLookupOutput,
 
     [Parameter(
         HelpMessage = "Perform connection tests prior to lookup: Ping, TCP port 53, All, None (default is All)"
@@ -202,8 +211,8 @@ Begin {
         $Task.Dispose()
     } #end Test-Ping
 
-    # Function to test telnet to DNS server
-    Function Test-Telnet {
+    # Function to test TCP connection to DNS server
+    Function Test-TCP {
         [CmdletBinding()]
         Param($Server,$ConnectionTestTimeout)
         $TCPObject = new-Object system.Net.Sockets.TcpClient
@@ -225,14 +234,14 @@ Begin {
                 $False
             }
         }
-    } #end Test-Telnet
+    } #end Test-TCP
 
     # Function to test A record lookup on DNS server
     Function Test-Lookup {
         [CmdletBinding()]
-        Param($Server,$RecordType,$Lookup,[switch]$NoRecurse,[switch]$Boolean,[switch]$Strict)
+        Param($Server,$RecordType,$Lookup,[switch]$NoRecurse,[switch]$Boolean,[switch]$Strict,[switch]$Truncate)
         Write-Verbose "[$Server] Look up $RecordType record for '$Lookup'"
-        $Param = @{
+        $Splat = @{
             Name         = $Lookup
             Server       = $Server
             QuickTimeout = $True
@@ -242,15 +251,17 @@ Begin {
             NoRecursion  = $NoRecurse
             ErrorAction  = "SilentlyContinue"
         }
-        If ($PSBoundParameters.RecordType) {$Param.Add("Type",$RecordType)}
+        If ($PSBoundParameters.RecordType) {$Splat.Add("Type",$RecordType)}
         Try {
             # If we got results
-            If ($Results = (Resolve-DNSName @Param | Select *)) {
+            If ($Results = (Resolve-DNSName @Splat| Select *)) {
                 Write-Verbose ($Results | Out-String)
 
                 # If we want to make sure we are getting the results back only for that record type
+                If ($Truncate.IsPresent) {$Results = ($Results | Select IP4Address,QueryType,Name,Type)}
                 If ($Strict.IsPresent -and $PSBoundParameters.RecordType) {
-                    If ($Results.QueryType -eq $RecordType) {
+                    $Results = $Results | Where-Object {$_.Type -eq $RecordType}
+                    If ($Results) {
                         If ($Boolean.IsPresent) {$True}
                         Else {Write-Output $Results}
                     }
@@ -301,14 +312,14 @@ Begin {
         Server         = $Null
         Lookup         = $Lookup
         RecordType     = $RecordType
-        Recursive      = $IsRecursive
+        Recursive      = $IsRecursive.IsPresent
         TestPing       = $InitialValue
         TestConnection = $InitialValue
         TestLookup     = $InitialValue
-        Output         = $InitialValue
         ComputerName   = $Env:ComputerName
-        SourceIP       = @(@(Get-WmiObject Win32_NetworkAdapterConfiguration | Select-Object -ExpandProperty IPAddress) -like "*.*")        
+        SourceIP       = @(@(Get-WmiObject Win32_NetworkAdapterConfiguration | Select-Object -ExpandProperty IPAddress) -like "*.*") -join(", ")
         Messages       = $InitialValue
+        Output         = $InitialValue
 
     })
     If (-not $ReturnLookupData.IsPresent) {
@@ -339,6 +350,7 @@ Begin {
     #endregion Output object
 
     #region Splats
+
     [switch]$TestPing = $True
     [switch]$TestTCPConnection = $True
     Switch ($ConnectionTests) {
@@ -365,10 +377,10 @@ Begin {
         }
     }
 
-    # Splat for Test-Ping
+    # Splat for Test-TCP
     If ($TestTCPConnection.IsPresent) {
-        $Param_Telnet = @{}
-        $Param_Telnet = @{
+        $Param_TCP = @{}
+        $Param_TCP = @{
             Server                = $Null
             ConnectionTestTimeout = $ConnectionTestTimeout
             ErrorAction           = "Silentlycontinue"
@@ -387,7 +399,10 @@ Begin {
         WarningAction = "Silentlycontinue"
         ErrorVariable = "Nope"
     }
-    If ($ReturnLookupData.IsPresent) {$Param_Lookup.Boolean = $False}
+    If ($ReturnLookupData.IsPresent) {
+        $Param_Lookup.Boolean = $False
+        $Param_Lookup.Truncate = $TruncateLookupOutput
+    }
     If ($RecordType -ne "Any") {
         $Param_Lookup.Add("RecordType",$RecordType)
         $Param_Lookup.Add("Strict",$True)
@@ -410,16 +425,16 @@ Begin {
     $BGColor = $host.UI.RawUI.BackgroundColor
     $Msg = "BEGIN  : $Activity"
     $FGColor = "Yellow"
-    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"`n$Msg`n")}
+    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"`n$Msg")}
     Else {Write-Verbose $Msg}
 
 }
 Process {
 
-    $Total = $DNSServer.Count
+    $Total = $Server.Count
     $Current = 0
 
-    Foreach ($S in $DNSServer) {
+    Foreach ($S in $Server) {
         
         $Param_WP.Status = $S
         $Param_WP.PercentComplete = ($Current/$Total*100)
@@ -433,7 +448,7 @@ Process {
         # Just in case someone hasn't been careful with their parameters (ask me how I know)
         If ($Server -eq $Lookup) {
             $Msg = "DNS server and lookup target are identical"
-            $Messages += $Msg
+            #$Messages += $Msg
             Write-Warning "[$S] $Msg"
             $ConfirmMsg = "`n$Msg`nDo you wish to proceed with DNS query?`n"
             If ($PSCmdlet.ShouldContinue($ConfirmMsg,$Server)) {
@@ -441,7 +456,7 @@ Process {
             }
             Else {
                 $Msg = "Operation cancelled by user"
-                $Messages += $Msg
+                #$Messages += $Msg
                 If (-not $Quiet.IsPresent) {
                     $FGColor = "White"
                     $Host.UI.WriteLine($FGColor,$BGColor,"[$S] $Msg")
@@ -482,7 +497,7 @@ Process {
                             $Host.UI.WriteLine($FGColor,$BGColor,"[$S] $Msg")
                         }
                         $Output.TestPing = $True
-                        $Messages += $Msg
+                        #$Messages += $Msg
                         $Continue = $True
                     }
                     Else {
@@ -490,8 +505,9 @@ Process {
                         $Elapsed = ($EndTime - $StartTime).MilliSeconds
                         $Output.TestPing = $False
                         $Msg = "Ping failed after $Elapsed milliseconds"
-                        $Host.UI.WriteErrorLine("[$S] $Msg")
-                        $Messages += $Msg
+                        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("[$S] $Msg")}
+                        Else {Write-Verbose "[$S] $Msg"}
+                        ##$Messages += $Msg
                     }
                 }
                 Catch {
@@ -499,15 +515,15 @@ Process {
                     $Elapsed = ($EndTime - $StartTime).MilliSeconds
                     $Msg = "Ping failed after $Elapsed milliseconds"
                     If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
-                    $Host.UI.WriteErrorLine("[$S] $Msg")
-                    $Messages += $Msg
+                    If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("[$S] $Msg")}
+                    Else {Write-Verbose "[$S] $Msg"}
+                    #$Messages += $Msg
                 }
             }
             Else {
-                #$Output.TestPing = "-"
                 $Msg = "Ping test skipped"
                 Write-Verbose "[$S] $Msg"
-                $Messages += $Msg
+                #$Messages += $Msg
             }
         }
         
@@ -531,8 +547,8 @@ Process {
 
                 Try {
                     $StartTime = Get-Date
-                    $Param_Telnet.Server = $S
-                    If ($Null = Test-Telnet @Param_Telnet) {
+                    $Param_TCP.Server = $S
+                    If ($Null = Test-TCP @Param_TCP) {
                         $EndTime = Get-Date
                         $Elapsed = ($EndTime - $StartTime).MilliSeconds
                         $Msg = "TCP connection on port 53 succeeded in $Elapsed milliseconds"
@@ -541,32 +557,36 @@ Process {
                             $Host.UI.WriteLine($FGColor,$BGColor,"[$S] $Msg")
                         }
                         $Output.TestConnection = $True
-                        $Messages += $Msg
+                        #$Messages += $Msg
                         $Continue = $True
                     }
                     Else {
                         $EndTime = Get-Date
                         $Elapsed = ($EndTime - $StartTime).MilliSeconds
                         $Msg = "TCP connection on port 53 failed after $Elapsed milliseconds"
-                        $Host.UI.WriteErrorLine("[$S] $Msg")
+                        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("[$S] $Msg")}
+                        Else {Write-Verbose "[$S] $Msg"}
                         $Output.TestConnection = $False
-                        $Messages += $Msg
+                        #$Messages += $Msg
                     }
                 }
                 Catch {
                     $EndTime = Get-Date
                     $Elapsed = ($EndTime - $StartTime).MilliSeconds
                     $Msg = "TCP connection on port 53 failed after $Elapsed milliseconds"
-                    If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
-                    $Host.UI.WriteErrorLine("[$S] $Msg")
-                    $Messages += $Msg
+                    If ($ErrorDetails = $_.Exception.Message.Replace('"',"'")) {
+                        $Msg += " ($ErrorDetails)"
+                    }
+                    If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("[$S] $Msg")}
+                    Else {Write-Verbose "[$S] $Msg"}
+                    $Output.TestConnection = $False
+                    #$Messages += $Msg
                 }
             }
             Else {
-                #$Output.TestConnection = "-"
                 $Msg = "Connection test skipped"
                 Write-Verbose "[$S] $Msg"
-                $Messages += $Msg
+                #$Messages += $Msg
             }
         }
         
@@ -574,7 +594,7 @@ Process {
         # Look up A record
         If ($Continue.IsPresent) {
             
-            $Msg = "Test record lookup for '$Lookup' on DNS server"
+            $Msg = "Perform DNS lookup (type: $RecordType) for '$Lookup' on DNS server"
             If ($NoRecursion.IsPresent) {$Msg += " (non-recursive)"}
             If (-not $Quiet.IsPresent) {
                 $FGColor = "White"
@@ -596,7 +616,7 @@ Process {
                     $Msg = "$($RecordLookup[$RecordType]) lookup failed after $Elapsed milliseconds"
                     $Host.UI.WriteErrorLine("[$S] $Msg")
                     $Output.TestLookup = $False
-                    $Messages += $Msg
+                    #$Messages += $Msg
                 }
                 Else {
                     $Msg = "$($RecordLookup[$RecordType]) lookup succeeded in $Elapsed milliseconds"
@@ -607,9 +627,15 @@ Process {
                         $Host.UI.WriteLine($FGColor,$BGColor,"[$S] $Msg")
                     }
                     If ($ReturnLookupData.IsPresent) {
-                        $Output.Output = $Test | Out-String
+                        
+                        If ($TruncateLookupOutput.IsPresent) {
+                            $Output.Output = ($Test | Select-Object -First 1) # -join("`n"))# | Out-String)
+                        }
+                        Else {
+                            $Output.Output = $Test # | Out-String
+                        }
                     }
-                    $Messages += $Msg
+                    #$Messages += $Msg
                 }
             }
             Catch {
@@ -617,12 +643,14 @@ Process {
                 $Elapsed = ($EndTime - $StartTime).MilliSeconds
                 $Msg = "$($RecordLookup[$RecordType]) lookup failed after $Elapsed milliseconds"
                 If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
-                $Host.UI.WriteErrorLine("[$S] $Msg")
-                $Messages += $Msg
+                If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("[$S] $Msg")}
+                Else {Write-Verbose "[$S] $Msg"}
+                #$Messages += $Msg
             }
         } # end if proceeding to lookup
         
-        $Output.Messages = $Messages -join ("`n")
+        #$Output.Messages = $Messages -join ("; ")
+        $Output.Messages = $Msg
         Write-Output $Output
     }
 
@@ -635,7 +663,7 @@ End {
     $BGColor = $host.UI.RawUI.BackgroundColor
     $Msg = "END    : $Activity"
     $FGColor = "Yellow"
-    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"`n$Msg")}
+    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"$Msg")}
     Else {Write-Verbose $Msg}
 
 }    

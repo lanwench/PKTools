@@ -2,12 +2,12 @@
 Function Resolve-PKDNSName {
 <#
 .SYNOPSIS
-    Uses [System.Net.Dns]::GetHostEntryAsync to resolves a name to an IP address, or an IP address to a hostname
+    Uses [System.Net.Dns]::GetHostEntryAsync to resolves a hostname to an IP address, or an IP address to a hostname
 
 .DESCRIPTION
-    Uses [System.Net.Dns]::GetHostEntryAsync to resolves a name to an IP address, or an IP address to a hostname
-    Uses locally configured nameservers (cannot be specified)
-    Optional -ReturnTrueOnly switch does not return objects for failed queries
+    Uses [System.Net.Dns]::GetHostEntryAsync to resolves a hostname to an IP address, or an IP address to a hostname
+    Works where the DNSClient module is not available
+    Uses locally configured nameservers only
     Accepts pipeline input
     Returns a PSObject
 
@@ -23,90 +23,112 @@ Function Resolve-PKDNSName {
         *** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
 
         v01.00.0000 - 2018-01-26 - Created script
-        v02.00.0000 - 2019-03-28 - Overhauled & renamed from Test-PKDNSResolution
+        v02.00.0000 - 2019-03-28 - Totally overhauled & renamed from Test-PKDNSResolution; removed ReturnTrueOnly
 
 .PARAMETER InputObj
     Name, FQDN, or IP address to look up
 
-.PARAMETER SuppressConsoleOutput
-    Suppress all non-verbose/non-error console output
-
-.PARAMETER ReturnTrueOnly
-    Return results only for entries that successfully resolve
+.PARAMETER Quiet
+    Suppress all non-verbose console output
 
 .EXAMPLE
-    PS C:\> Test-PKDNSResolution -Verbose
+    PS C:\> Resolve-PKDNSName -Verbose
 
         VERBOSE: PSBoundParameters: 
 	
         Key            Value            
         ---            -----            
         Verbose        True             
-        Name           {WORKSTATION15}
+        Name           {LAPTOP14}
         ReturnTrueOnly False            
         Quiet          False            
         ScriptName     Resolve-PKDNSName
         ScriptVersion  2.0.0            
+        PipelineInput  False            
 
         BEGIN  : Test DNS name/IP resolution
-
-        [WORKSTATION15] Look up DNS record
-        [WORKSTATION15] Name resolution succeeded
+        [LAPTOP14] Resolved hostname to IP address in 0 milliseconds
+        
+        Input      : LAPTOP14
+        IsResolved : True
+        Output     : {172.20.2.30, ::1}
+        Nameserver : 172.20.2.30
+        Messages   : Resolved hostname to IP address in 0 milliseconds
 
         END    : Test DNS name/IP resolution
 
-        Input           IsResolved Output               Messages                 
-        -----           ---------- ------               --------                 
-        WORKSTATION15       True   {10.32.150.213, ::1} Name resolution succeeded
+.EXAMPLE
+     PS C:\>  Resolve-PKDNSName 127.0.0.1,sqlserver.domain.loca,google.com,!@#$%.com,thereisnowayanyoneregisteredthisdomain.info 
+
+        BEGIN  : Test DNS name/IP resolution
+        [127.0.0.1] Resolved IPv4 address to hostname in 1 milliseconds
+
+        Input      : 127.0.0.1
+        IsResolved : True
+        Output     : vmware-localhost
+        Nameserver : 172.20.2.30
+        Messages   : Resolved IPv4 address to hostname in 1 milliseconds
+
+        [sqlserver.domain.loca] Resolved hostname to IP address in 2 milliseconds
+        Input      : sqlserver.domain.loca
+        IsResolved : True
+        Output     : 10.62.179.193
+        Nameserver : 172.20.2.30
+        Messages   : Resolved hostname to IP address in 2 milliseconds
+
+        [google.com] Resolved hostname to IP address in 2 milliseconds
+        Input      : google.com
+        IsResolved : True
+        Output     : 172.217.3.206
+        Nameserver : 172.20.2.30
+        Messages   : Resolved hostname to IP address in 2 milliseconds
+
+        [!@#$%.com] Invalid hostname syntax
+        Input      : !@#$%.com
+        IsResolved : False
+        Output     : Error
+        Nameserver : 172.20.2.30
+        Messages   : Invalid hostname syntax
+
+        [thereisnowayanyoneregisteredthisdomain.info] Failed to resolve hostname to IP address after 37 milliseconds
+        Input      : thereisnowayanyoneregisteredthisdomain.info
+        IsResolved : False
+        Output     : Error
+        Nameserver : 172.20.2.30
+        Messages   : Failed to resolve hostname to IP address after 37 milliseconds
+
+        END    : Test DNS name/IP resolution
 
 .EXAMPLE
-     PS C:\>  Resolve-PKDNSName 127.0.0.1,sqlserver.domain.local,google.com,!@#$%.com,thereisnowayanyoneregisteredthisdomain.info -Verbose
-
+    PS C:\> Get-AllMyDCs -ADDomain domain.local -All | Select -first 5 | Resolve-PKDNSName -Verbose | Format-Table -AutoSize
+ 
+        Action: Get all Active Directory Domain Controllers in domain
         VERBOSE: PSBoundParameters: 
 	
-        Key            Value                                                                         
-        ---            -----                                                                         
-        Verbose        True                                                                          
-        Name           {127.0.0.1, sqlserver.domain.local, google.com, !@#$%.com...}
-        ReturnTrueOnly False                                                                         
-        Quiet          False                                                                         
-        ScriptName     Resolve-PKDNSName                                                             
-        ScriptVersion  2.0.0                                                                         
+        Key            Value            
+        ---            -----            
+        Verbose        True             
+        Name           
+        ReturnTrueOnly False            
+        Quiet          False            
+        PipelineInput  True             
+        ScriptName     Resolve-PKDNSName
+        ScriptVersion  2.0.0            
 
         BEGIN  : Test DNS name/IP resolution
-
-        [127.0.0.1] Look up DNS record
-        [127.0.0.1] Name resolution succeeded
-
-        [sqlserver.domain.local] Look up DNS record
-        [sqlserver.domain.local] Name resolution succeeded
-        [google.com] Look up DNS record
-        [google.com] Name resolution succeeded
-        [!@#$%.com] Look up DNS record
-        [!@#$%.com] Invalid syntax
-        [thereisnowayanyoneregisteredthisdomain.info] Look up DNS record
-        [thereisnowayanyoneregisteredthisdomain.info] Name resolution failed
-        
+        [RomeDC03] Resolved hostname to IP address in 3 milliseconds
+        [RomeDC01] Resolved hostname to IP address in 2 milliseconds
+        [LondonDC01] Resolved hostname to IP address in 3 milliseconds
+        [ParisDC02] Resolved hostname to IP address in 2 milliseconds
+        [MadridDC02] Resolved hostname to IP address in 7 milliseconds
         END    : Test DNS name/IP resolution
-
-        Input                                       IsResolved Output           Messages                 
-        -----                                       ---------- ------           --------                 
-        127.0.0.1                                         True vmware-localhost Name resolution succeeded
-        sqlserver.domain.local                            True 10.11.178.173    Name resolution succeeded
-        google.com                                        True 216.58.194.174   Name resolution succeeded
-        !@#$%.com                                        False Error            Invalid syntax           
-        thereisnowayanyoneregisteredthisdomain.info      False Error            Name resolution failed   
-
-.EXAMPLE
-    PS C:\> Resolve-PKDNSName 127.0.0.1,sqlserver.domain.local,google.com,!@#$%.com,thereisnowayanyoneregisteredthisdomain.info -Quiet -ReturnTrueOnly
-
-        Input                  IsResolved Output           Messages                 
-        -----                  ---------- ------           --------                 
-        127.0.0.1                    True vmware-localhost Name resolution succeeded
-        sqlserver.domain.local       True 10.11.178.173    Name resolution succeeded
-        google.com                   True 216.58.194.174   Name resolution succeeded
-
-
+        Input      IsResolved Output        Nameserver  Messages                                         
+        -----      ---------- ------        ----------  --------                                         
+        RomeDC03       True   10.50.142.103 172.20.2.30 Resolved hostname to IP address in 3 milliseconds
+        RomeDC01       True   10.92.142.11  172.20.2.30 Resolved hostname to IP address in 2 milliseconds
+        LondonDC01     True   10.44.136.43  172.20.2.30 Resolved hostname to IP address in 3 milliseconds
+        ParisDC02      True   10.12.128.198 172.20.2.30 Resolved hostname to IP address in 2 milliseconds
+        MadridDC02     True   10.76.136.30  172.20.2.30 Resolved hostname to IP address in 7 milliseconds
 
 #>
 [CmdletBinding()]
@@ -116,19 +138,13 @@ Param(
         ValueFromPipeline = $True,
         HelpMessage = "Hostname or IP for lookup"
     )]
-    [Alias("InputObj","IP","DNSHostName","FQDN")]
+    [Alias("Name","InputObj","IP","DNSHostName","FQDN","IPv4Address")]
     [ValidateNotNullOrEmpty()]
-    [object[]]$Name = $Env:ComputerName,
+    $InputObject = $Env:ComputerName,
 
     [Parameter(
-        HelpMessage = "Return output for successful name resolution only"
+        HelpMessage = "Suppress all non-verbose/non-error console output"
     )]
-    [switch]$ReturnTrueOnly,
-
-    [Parameter(
-        HelpMessage = "Suppress all non-verbose console output"
-    )]
-    [ValidateNotNullOrEmpty()]
     [Alias("SuppressConsoleOutput")]
     [switch]$Quiet
 )
@@ -140,12 +156,15 @@ Begin {
 
     # Show our settings
     $CurrentParams = $PSBoundParameters
+    [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
         Where {Test-Path variable:$_}| Foreach {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+    $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
     $CurrentParams.Add("ScriptVersion",$Version)
+    If ($PipelineInput.IsPresent) {$CurrentParams.InputObject = $Null}
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
     # Preferences 
@@ -174,9 +193,12 @@ Begin {
     #endregion Splats
 
     #region Regex
-    
     $InvalidNameRegex = '[\\%\/:"*?<>@)(~#&$|]+'
-    $ValidIPRegex = "\b(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\b"
+    $IPRegex = "^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" # This is to separate IP format from hostname/string
+    $ValidIPRegex = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+
+    # Get local DNS servers
+    $DNSServers = (Get-WmiObject Win32_NetworkAdapterConfiguration | Select-Object -ExpandProperty IPAddress)
 
     #endregion Regex
     
@@ -184,7 +206,7 @@ Begin {
     $BGColor = $host.UI.RawUI.BackgroundColor
     $Msg = "BEGIN  : $Activity"
     $FGColor = "Yellow"
-    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"`n$Msg`n")}
+    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"$Msg")}
     Else {Write-Verbose $Msg}
 
 }
@@ -192,103 +214,124 @@ Begin {
 Process {
     
     # Remove any dupes
-    $Name = ($Name | Select-Object -Unique)
+    $InputObject = ($InputObject | Select-Object -Unique)
 
-    $Total = $Name.Count
+    $Total = ($InputObject -as [array]).Count
     $Current = 0
 
     # Create new object with additional properties
-    [array]$Lookup = ($Name | 
+    [array]$Output = ($InputObject | 
         Select-Object @{N="Input";E={$_}},
         @{N="IsResolved";E={"Error"}},
         @{N="Output";E={"Error"}},
-        #@{N="NameServer";E={@(Get-WmiObject Win32_NetworkAdapterConfiguration | Select-Object -ExpandProperty IPAddress)}},
+        @{N="Nameserver";E={$DNSServers}},
         @{N="Messages";E={"Error"}}
     )
 
     Try {
-    
-        Foreach ($Item in $Lookup) {
+        Foreach ($Item in $Output) {
             
             $Current ++
 
             $Msg = "Look up DNS record"
-            $FGColor = "White"
-            If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"[$($Item.Input)] $Msg")}
-            Else {Write-Verbose "[$($Item.Input)] $Msg"}
-
             $Param_WP.CurrentOperation = $Msg
             $Param_WP.PercentComplete = ($Current/$Total * 100)
             $Param_WP.Status = "$([math]::Round($Current/$Total * 100))%"
             Write-Progress @Param_WP
-            
-            # Object to return
-            $Output = @() 
-            
-             If ($Item.Input -match $InvalidNameRegex) {
-                $Msg = "Invalid syntax"
-                If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("[$($Item.Input)] $Msg")}
-                Else {Write-Verbose $Msg}
-                
-                If (-not $ReturnTrueOnly.IsPresent) {
-                    $Item.IsResolved = $False
-                    $Item.Messages = $Msg
-                    $Output = $Item
+
+            # Make sure input is valid
+            [switch]$Continue = $False
+            If ($Item.Input -match $IPRegex) {
+                If ($Item.Input -match $ValidIPRegex) {
+                    $Type = "IPv4 address"
+                    $ToType = "hostname"
+                    $Continue = $True
                 }
-             }
-            
+                Else {
+                    $Msg = "Invalid IPv4 address syntax"
+                    If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("[$($Item.Input)] $Msg")}
+                    Else {Write-Warning $Msg}
+                    $Item.Messages = $Msg
+                    $Item.IsResolved = $False
+                }
+            }
             Else {
+                If ($Item.Input -notmatch $InvalidNameRegex) {
+                    $Type = "hostname"
+                    $ToType = "IP address"
+                    $Continue = $True
+                }
+                Else {
+                    $Msg = "Invalid hostname syntax"
+                    If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("[$($Item.Input)] $Msg")}
+                    Else {Write-Warning $Msg}
+                    $Item.Messages = $Msg
+                    $Item.IsResolved = $False
+                }
+            } #end switch
+
+            If ($Continue.IsPresent) {
+                
+                # Start the timer
+                $Stopwatch =  [system.diagnostics.stopwatch]::StartNew()
                 $Task = $Null
                 $Task = [System.Net.Dns]::GetHostEntryAsync($Item.Input)
-
-                If ($Task.Result) {
                 
-                    $Msg = "Name resolution succeeded"
+                If ($Task.Result) {
+
+                    $Stopwatch.Stop()    
+                    $Elapsed = [math]::Round($Stopwatch.Elapsed.TotalMilliseconds)
+                    $Msg = "Resolved $Type to $ToType in $Elapsed millisecond(s)"
                     $FGColor = "Green"
                     If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"[$($Item.Input)] $Msg")}
                     Else {Write-Verbose "[$($Item.Input)] $Msg"}
 
                     $Item.IsResolved = $True
-                    $Item.Output = Switch -Regex ($Item.Input) {
-                        $ValidIPRegex {$Task.Result.Hostname}
-                        Default       {$Task.Result.AddressList.IPAddressToString}
+
+                    $Item.Output = Switch ($Type) {
+                        "Hostname"   {
+                            $Task.Result.AddressList.IPAddressToString
+                        }    
+                        "IPv4 address" {
+                            $Task.Result.Hostname
+                        }
+                        Default {}
                     }
                     $Item.Messages = $Msg
-
-                    $Output = $Item
-                }
+                } #end if results
                 Else {
-                    $Msg = "Name resolution failed"
+                    $Stopwatch.Stop()
+                    $Elapsed = [math]::Round($Stopwatch.Elapsed.TotalMilliseconds)
+                    $Msg = "Failed to resolve $Type to $ToType after $Elapsed millisecond(s)"
                     If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("[$($Item.Input)] $Msg")}
                     Else {Write-Verbose $Msg}
 
                     If (-not $ReturnTrueOnly.IsPresent) {
                         $Item.IsResolved = $False
                         $Item.Messages = $Msg
-                        $Output = $Item
                     }
-                }
+                } #end if no results
 
                 # Clean up
                 $Task.Dispose()
             }
 
-            Write-Output $Output
+            Write-Output $Item
 
         } #end for each
     }
     Catch {
         $Msg = "Operation failed"
-        If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
-        If (-not $Quiet.IsPresent) {$Host.UI.ErrorLine($Msg)}
+        If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
+        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine($Msg)}
         Else {Write-Verbose $Msg}
 
         If (-not $ReturnTrueOnly.IsPresent) {
             New-Object PSObject -Property ([ordered]@{
-                Input      = $Name
+                Input      = $InputObject
                 IsResolved = $False
                 Output     = "Error"
-                #NameServer = (Get-WmiObject Win32_NetworkAdapterConfiguration | Select-Object -ExpandProperty IPAddress)
+                NameServer = $DNSServers
                 Messages   = $Msg
             })
         }
@@ -302,101 +345,13 @@ End {
     
     $Msg = "END    : $Activity"
     $FGColor = "Yellow"
-    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"`n$Msg`n")}
+    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"$Msg")}
     Else {Write-Verbose $Msg}
     
 }
 } #end Resolve-PKDNSName
 
 $Null = New-Alias -Name Resolve-PKDNSRecord -Value Resolve-PKDNSName -Description "Guessability" -Force -Confirm:$False
+$Null = New-Alias -Name Resolve-PKDNSAddress -Value Resolve-PKDNSName -Description "Guessability" -Force -Confirm:$False
+$Null = New-Alias -Name Resolve-PKDNSIP -Value Resolve-PKDNSName -Description "Guessability" -Force -Confirm:$False
 
-
-
-<#
- # Function if we want to check additional nameservers
-    Function LookupDNS { 
-        [Cmdletbinding()]
-        Param(
-            [string[]]$Target,
-            $NS
-        )
-        [switch]$NSLookup = $False
-        If ($NS) {
-            Write-Verbose "Nameserver: $NS"
-            If ($TestNS = (new-object Net.Sockets.TcpClient -ErrorAction Stop -Verbose)) {
-                If (-not ($TestNS.ConnectAsync($NS,53))) {
-                    $Msg = "No response from nameserver $NS"
-                    $Host.UI.WriteErrorLine($Msg)
-                    Break
-                }
-            }
-            Else {$NSLookup = $True}
-        }
-        Else {
-            Write-Verbose "Nameserver: Local default"
-        }
-
-        Foreach ($T in $Target) {
-
-            $Output = New-Object PSObject -Property ([ordered]@{
-                Input      = $T
-                Mode       = "Error"
-                Name       = "Error"
-                IPAddress  = "Error"
-                Messages   = "Error"
-            })
-
-            # If IP address
-            If ($T -as [ipaddress]) {
-                
-                $Output.Mode = "Reverse"
-
-                If ($NSLookup.IsPresent) {
-
-                    If ($Lookup = Invoke-Expression -Command "nslookup $T $NS 2>&1" -OutVariable Results -EA SilentlyContinue) {
-                        $Output.IPAddress = ($Results | Select-String address | select-Object -last 1).toString().split(":")[1].trim()
-                        $Output.Name = ($Results | Select-String name | select-Object -last 1).toString().split(":")[1].trim()
-                        $Output.Messages = $Null
-                    }
-                    Else {$Output.Messages = "Reverse lookup failed for $T"}
-                }
-                Else {
-                    If ($Results = [System.Net.DNS]::GetHostByAddress($T)) {
-                        $Output.IPAddress = $($Results.AddressList)                
-                        $Output.Name = ($Results.hostname.tolower())
-                        $Output.Messages = $Null
-                    }
-                    Else {$Output.Messages = "Reverse lookup failed for $T"}
-                }
-            }
-            
-            # If hostname 
-            Else {
-
-                $Output.Mode = "Forward"
-
-                If ($NSLookup.IsPresent) {
-                    
-                    If ($Lookup = Invoke-Expression -Command "nslookup $T $NS 2>&1" -OutVariable Results -EA SilentlyContinue) {
-                        $Output.IPAddress = ($Results | Select-String address | select-Object -last 1).toString().split(":")[1].trim()
-                        $Output.Name = ($Results | Select-String name | select-Object -last 1).toString().split(":")[1].trim()
-                        $Output.Messages = $Null
-                    }
-                    Else {$Output.Messages = "Forward lookup failed for $T"}
-                }
-                Else {
-                    If ($Results = [System.Net.DNS]::GetHostByName($T)) {
-                        $Output.IPAddress = $($Results.AddressList)                
-                        $Output.Name = ($Results.hostname.tolower())
-                        $Output.Messages = $Null
-                    }
-                    Else {$Output.Messages = "Forward lookup failed for $T"}
-                }
-            }
-            
-            Write-Output $Output
-        }
-    }
-    
-    #endregion Functions
-#>
