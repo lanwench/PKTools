@@ -6,6 +6,7 @@ Function New-PKISESnippetFunctionInvokeCommand {
 
 .DESCRIPTION
     Adds a new PS ISE snippet containing a template function (function runs Invoke-Command on one or more computers interactively or as a job)
+    Author name can be manually specified or the current user's name can be detected using WMI & the local registry
     SupportsShouldProcess
     Returns a string
 
@@ -13,7 +14,7 @@ Function New-PKISESnippetFunctionInvokeCommand {
     Name    : Function_New-PKISESnippetFunctionInvokeCommand.ps1
     Created : 2017-11-28
     Author  : Paula Kingsley
-    Version : 01.03.0000
+    Version : 01.04.0000
     History :
 
         ** PLEASE KEEP $VERSION UPDATED IN BEGIN BLOCK **
@@ -21,13 +22,15 @@ Function New-PKISESnippetFunctionInvokeCommand {
         v01.00.0000 - 2017-11-28 - Created script
         v01.01.0000 - 2018-03-06 - Updated scriptblock/snippet
         v01.02.0000 - 2018-10-15 - Updated, cosmetic improvements
-        v01.03.0000 - 2018-10-19 - Renamed, added autodetect for author, made consistent with otheer New-PKISESnippet* 
+        v01.03.0000 - 2018-10-19 - Renamed, added autodetect for author, made consistent with other New-PKISESnippet* 
+        v01.04.0000 - 2019-05-23 - Updated scriptblock for snippet & changed parameter for autodetect v manual authorname,
+                                   other cosmetic changes
 
 .PARAMETER Author
     Author name
 
-.PARAMETER AutoDetectAuthorFullName
-    Attempt to match the current username to their full name via the registry & WMI
+.PARAMETER AuthorNameOption
+    Set author name manually, or attempt to detect current user's full name (default)
 
 .PARAMETER Force
     Forces creation even if snippet name exists
@@ -99,38 +102,45 @@ Function New-PKISESnippetFunctionInvokeCommand {
 
 #>
 [Cmdletbinding(
-    DefaultParameterSetName = "Name",
     SupportsShouldProcess = $True,
     ConfirmImpact = "High"
 )]
 Param(
+    
     [Parameter(
-        Mandatory = $True,
-        ParameterSetName = "Name",
-        HelpMessage = "Author name"
+        HelpMessage = "Set author name manually, or attempt to detect current user's full name (default)"
+    )]
+    [ValidateSet("Manual","AutoDetect")]
+    [String]$AuthorNameOption = "AutoDetect",
+    
+    [Parameter(
+        HelpMessage = "Author name (if not using Autodetect)"
     )]
     [ValidateNotNullOrEmpty()]
     [string]$Author,
 
     [Parameter(
-        ParameterSetName = "Detect",
-        HelpMessage = "Attempt to detect author name (currently logged-in user's full name)"
+        HelpMessage = "Overwrite existing snippet"
     )]
-    [switch]$AutoDetectAuthorFullName,
-    
+    [switch]$Force,
+
     [Parameter(
-        Mandatory = $False,
-        HelpMessage = "Force creation of snippet even if name already exists"
+        HelpMessage = "Hide all non-verbose console output"
     )]
-    [switch]$Force
+    [Alias("SuppressConsoleOutput")]
+    [switch]$Quiet
 )
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.03.0000"
+    [version]$Version = "01.04.0000"
     
     # Show our settings
     $CurrentParams = $PSBoundParameters
+    If (($AuthorNameOption -eq "Autodetect") -and ($CurrentParams.Author)) {
+        $AuthorNameOption = "Manual"
+        $CurrentParams.AuthorNameOption = "Manual"
+    }
     $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
         Where {Test-Path variable:$_}| Foreach {
             $CurrentParams.Add($_, (Get-Variable $_).value)
@@ -143,26 +153,30 @@ Begin {
     $ErrorActionPreference = "Stop"
     $ProgressPreference = "Continue"
 
-    # General purpose splat
-    $StdParams = @{}
-    $StdParams = @{
-        ErrorAction = "Stop"
-        Verbose     = $False
-    }
-    
-    If (-not $PSISE) {
-        $Msg = "This function requires the PowerShell ISE environment"
-        $Host.UI.WriteErrorLine($Msg)
-        Break
+    #region Functions
+
+    # Function to write a console message or a verbose message
+    Function Write-MessageInfo {
+        Param([Parameter(ValueFromPipeline)]$Message,$FGColor,[switch]$Title)
+        $BGColor = $host.UI.RawUI.BackgroundColor
+        If (-not $Quiet.IsPresent) {
+            If ($Title.IsPresent) {$Message = "`n$Message`n"}
+            $Host.UI.WriteLine($FGColor,$BGColor,"$Message")
+        }
+        Else {Write-Verbose "$Message"}
     }
 
-    #region Snippet info
+    # Function to write an error or a verbose message
+    Function Write-MessageError {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message)#,[switch]$Quiet = $Quiet)
+        $BGColor = $host.UI.RawUI.BackgroundColor
+        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("$Message")}
+        Else {Write-Verbose "$Message"}
+    }
 
-    $SnippetName = "PK Invoke-Command function"
-    $Description = "Snippet to create a new function to run Invoke-Command; created using New-PKISESnippetFunctionInvokeCommand"
-    
-    If ($AutoDetectAuthorFullName.IsPresent) {
-        
+    # Function to get the current user's full name via WMI/registry
+    If ($AuthorNameOption -eq "AutoDetect") {
         Function GetFullName {
             $SIDLocalUsers = Get-WmiObject Win32_UserProfile -EA Stop | select-Object Localpath,SID
             $UserName = (Get-WMIObject -class Win32_ComputerSystem -Property UserName -ErrorAction Stop).UserName
@@ -182,24 +196,33 @@ Begin {
                 } #end if matching profile path
             }
         } #end function
-        
-        If (-not ($AuthorName = GetFullName)) {
-            $Msg = "Failed to get current user's full name; please set Author manually"
-            $Host.UI.WriteErrorLine("ERROR: $Msg")
-            Break
-        }
-        Else {
-            $Msg = "Setting author to current user's full name, '$AuthorName'"
-            Write-Verbose $Msg
-        }
-    }
-    Else {
-        $AuthorName = $Author
-        $Msg = "Setting author name to '$AuthorName'"
-        Write-Verbose $Msg
     }
 
-    #endregion Snippet info
+    #endregion Functions
+
+    #region Prerequisites
+
+    If (-not $PSISE) {
+        $Msg = "This function requires the PowerShell ISE environment"
+        "[$Env:ComputerName] $Msg" | Write-MessageError
+        Break
+    }
+
+    If ($AuthorNameOption -eq "Manual" -and (-not $CurrentParams.Author)) {
+        $Msg = "Author name must be provided when -AuthorNameOption is set to 'Manual'"
+        "[$Env:ComputerName] $Msg" | Write-MessageError
+        Break
+    } 
+
+    #region Prerequisites
+
+    #region Snippet variables
+
+    $SnippetName = "PK Invoke-Command function"
+    $Description = "Snippet to create a new function to run Invoke-Command; created using New-PKISESnippetFunctionInvokeCommand"
+    $SnippetFile = $SnippetName +".snippets.ps1xml"
+
+    #endregion Snippet variables
 
     #region Here-string for function content    
 
@@ -208,15 +231,16 @@ $Body = @'
 Function Do-SomethingCool {
 <# 
 .SYNOPSIS
-    Does something cool, interactively or as a PSJob
+    Invokes a scriptblock to do something cool, interactively or as a PSJob
 
 .DESCRIPTION
-    Does something cool, interactively or as a PSJob
+    Invokes a scriptblock to do something cool, interactively or as a PSJob
     Accepts pipeline input
+    Optionally tests connectivity to remote computers before invoking scriptblock
     Returns a PSobject or PSJob
 
 .NOTES        
-    Name    : Function_Do-Somethingcool.ps1
+    Name    : Function_Do-SomethingCool.ps1
     Created : ##CREATEDATE##
     Author  : ##AUTHOR##
     Version : 01.00.0000
@@ -227,24 +251,26 @@ Function Do-SomethingCool {
         v01.00.0000 - ##CREATEDATE## - Created script
 
 .PARAMETER ComputerName
-    One or more computer names
+    One or more computer names (default is local computer)
 
 .PARAMETER Credential
-    Valid credentials on target (default is current user credentials)
+    Valid credentials on target (default is passthrough)
 
 .PARAMETER AsJob
-    Invoke command as a PSjob
+    Run Invoke-Command scriptblock as PSJob
+
+.PARAMETER JobPrefix
+    Prefix for job name (default is 'Job')
 
 .PARAMETER ConnectionTest
-    Run WinRM or ping connectivity test prior to Invoke-Command, or no test (default is WinRM)
+    Options to test connectivity on remote computer prior to Invoke-Command - WinRM with Kerberos, ping, or none (default is WinRM)
 
-.PARAMETER SuppressConsoleOutput
-    Hide all non-verbose/non-error console output
+.PARAMETER Quiet
+    Hide all non-verbose console output
 
 .EXAMPLE
-    PS C:\> Do-SomethingCool -ComputerName foo -Verbose
+    PS C:\> 
 
-        
 #> 
 
 [CmdletBinding(
@@ -256,17 +282,16 @@ Function Do-SomethingCool {
 Param (
     [Parameter(
         Position = 0,
-        Mandatory=$True,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True,
-        HelpMessage="One or more computer names"
+        ValueFromPipeline = $True,
+        ValueFromPipelineByPropertyName = $True,
+        HelpMessage = "One or more computer names (default is local computer)"
     )]
     [ValidateNotNullOrEmpty()]
     [Alias("Computer","Name","HostName","FQDN")]
-    [String[]] $ComputerName,
+    [object[]]$ComputerName,
 
     [Parameter(
-        HelpMessage="Valid credentials on target"
+        HelpMessage = "Valid credentials on target (default is passthrough)"
     )]
     [ValidateNotNullOrEmpty()]
     [pscredential] $Credential = [System.Management.Automation.PSCredential]::Empty,
@@ -284,15 +309,16 @@ Param (
     [String] $JobPrefix = "Job",
 
     [Parameter(
-        HelpMessage="Test to run prior to Invoke-Command - WinRM (default, using Kerberos), ping, or none)"
+        HelpMessage = "Options to test connectivity on remote computer prior to Invoke-Command - WinRM with Kerberos, ping, or none (default is WinRM)"
     )]
     [ValidateSet("WinRM","Ping","None")]
     [string] $ConnectionTest = "WinRM",
 
     [Parameter(
-        HelpMessage="Hide all non-verbose/non-error console output"
+        HelpMessage = "Hide all non-verbose console output"
     )]
-    [Switch] $SuppressConsoleOutput
+    [Alias("SuppressConsoleOutput")]
+    [Switch] $Quiet
 
 )
 
@@ -303,46 +329,36 @@ Begin {
 
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
-    [switch]$PipelineInput = (-not $PSBoundParameters.ContainsKey("ComputerName")) -and (-not $ComputerName)
+    [switch]$PipelineInput = $MyInvocation.ExpectingInput
+    
     $CurrentParams = $PSBoundParameters
     $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
         Where {Test-Path variable:$_}| Foreach {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+    If (-not $PipelineInput.IsPresent -and -not $CurrentParams.ComputerName) {
+        $ComputerName = $CurrentParams.ComputerName = $Env:ComputerName
+    }
     $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
     $CurrentParams.Add("ScriptVersion",$Version)
+    $CurrentParams.Add("PipelineInput",$PipelineInput)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
     # Preferences 
     $ErrorActionPreference = "Stop"
     $ProgressPreference    = "Continue"
     
-    # Output
-    [array]$Results = @()
-    
     #region Scriptblock for Invoke-Command
 
     $ScriptBlock = {
         
-        Param($Arguments)
-
-        $ErrorActionPreference = "Stop"
-        $InitialValue = "Error"
-        $Output = New-Object PSObject -Property @{
-            ComputerName = $Env:ComputerName
-            Messages     = $InitialValue
-        }
-        $Select = "ComputerName","Messages"
-        
+        Param($Thing)
         Try {
-            # Impressive code here
+            Get-Item $Thing
         }
         Catch {
-            $Output.Messages = $_.Exception.Message
-            Write-Output ($Output | Select $Select)
+            Throw $_.Exception.Message
         }
-        
-        Write-Output ($Output | Select-Object $Select)
 
     } #end scriptblock
 
@@ -350,6 +366,27 @@ Begin {
 
     #region Functions
 
+    # Function to write a console message or a verbose message
+    Function Write-MessageInfo {
+        Param([Parameter(ValueFromPipeline)]$Message,$FGColor,[switch]$Title)
+        $BGColor = $host.UI.RawUI.BackgroundColor
+        If (-not $Quiet.IsPresent) {
+            If ($Title.IsPresent) {$Message = "`n$Message`n"}
+            $Host.UI.WriteLine($FGColor,$BGColor,"$Message")
+        }
+        Else {Write-Verbose "$Message"}
+    }
+
+    # Function to write an error or a verbose message
+    Function Write-MessageError {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message)#,[switch]$Quiet = $Quiet)
+        $BGColor = $host.UI.RawUI.BackgroundColor
+        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("$Message")}
+        Else {Write-Verbose "$Message"}
+    }
+
+    # Function to test WinRM connectivity
     Function Test-WinRM{
         Param($Computer)
         $Param_WSMAN = @{
@@ -366,6 +403,7 @@ Begin {
         Catch {$False}
     }
 
+    # Function to test ping connectivity
     Function Test-Ping{
         Param($Computer)
         $Task = (New-Object System.Net.NetworkInformation.Ping).SendPingAsync($Computer)
@@ -377,17 +415,10 @@ Begin {
 
     #region Splats
 
-    # General purpose splat
-    $StdParams = @{}
-    $StdParams = @{
-        ErrorAction = "Stop"
-        Verbose     = $False
-    }
-
     # Splat for Write-Progress
     $Activity = "Invoke scriptblock"
     If ($AsJob.IsPresent) {
-        $Activity = "$Activity as remote PSJob"
+        $Activity = "$Activity (as job)"
     }
     $Param_WP = @{}
     $Param_WP = @{
@@ -401,7 +432,7 @@ Begin {
     $ConfirmMsg = $Activity
     $Param_IC = @{}
     $Param_IC = @{
-        ComputerName   = ""
+        ComputerName   = $Null
         Authentication = "Kerberos"
         ScriptBlock    = $ScriptBlock
         Credential     = $Credential
@@ -417,11 +448,8 @@ Begin {
     #endregion Splats
 
     # Console output
-    $BGColor = $host.UI.RawUI.BackgroundColor
-    $Msg = "Action: $Activity"
-    $FGColor = "Yellow"
-    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"$Msg`n")}
-    Else {Write-Verbose $Msg}
+    $Msg = "BEGIN  : $Activity"
+    $Msg | Write-MessageInfo -FGColor Yellow -Title
 
 
 } #end begin
@@ -434,11 +462,20 @@ Process {
 
     Foreach ($Computer in $ComputerName) {
         
-        $Computer = $Computer.Trim()
+        If ($Computer -is [string]) {
+            $Computer = $Computer.Trim()
+        }
+        Elseif ($Computer -is [Microsoft.ActiveDirectory.Management.ADAccount]) {
+            If ($Computer.DNSHostName) {
+                $Computer = $Computer.DNSHostName
+            }
+            Else {
+                $Computer = $Computer.Name
+            }
+        }
+        
         $Current ++ 
-
-        [int]$percentComplete = ($Current/$Total* 100)
-        $Param_WP.PercentComplete = $PercentComplete
+        $Param_WP.PercentComplete = ($Current/$Total* 100)
         $Param_WP.Status = $Computer
         
         [switch]$Continue = $False
@@ -448,20 +485,21 @@ Process {
             Ping {
                 If ($Computer -ne $env:COMPUTERNAME) {
                     $Msg = "Ping computer"
+                    "[$Computer] $Msg" | Write-MessageInfo -FGColor White
+                    
                     $Param_WP.CurrentOperation = $Msg
-                    Write-Verbose "[$Computer] $Msg"
                     Write-Progress @Param_WP
 
                     If ($PSCmdlet.ShouldProcess($Computer,"`n$Msg`n")) {
                         If ($Null = Test-Ping -Computer $Computer) {$Continue = $True}
                         Else {
                             $Msg = "Ping failure"
-                            $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                            "[$Computer] $Msg" | Write-MessageError
                         }
                     }
                     Else {
                         $Msg = "Ping connection test cancelled by user"
-                        $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                        "[$Computer] $Msg" | Write-MessageInfo -FGColor Cyan
                     }
                 }
                 Else {$Continue = $True}
@@ -469,20 +507,23 @@ Process {
             WinRM {
                 If ($Computer -ne $env:COMPUTERNAME) {
                     $Msg = "Test WinRM connection"
+                    "[$Computer] $Msg" | Write-MessageInfo -FGColor White
+                    
                     $Param_WP.CurrentOperation = $Msg
-                    Write-Verbose "[$Computer] $Msg"
                     Write-Progress @Param_WP
 
                     If ($PSCmdlet.ShouldProcess($Computer,"`n$Msg`n")) {
-                        If ($Null = Test-WinRM -Computer $Computer) {$Continue = $True}
+                        If ($Null = Test-WinRM -Computer $Computer) {
+                            $Continue = $True
+                        }
                         Else {
                             $Msg = "WinRM failure"
-                            $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                            "[$Computer] $Msg" | Write-MessageError
                         }
                     }
                     Else {
                         $Msg = "WinRM connection test cancelled by user"
-                        $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                        "[$Computer] $Msg" | Write-MessageInfo -FGColor Cyan
                     }
                 }
                 Else {$Continue = $True}
@@ -496,8 +537,9 @@ Process {
                 Try {
                     $Msg = "Invoke command"
                     If ($AsJob.IsPresent) {$Msg += " as PSJob"}
+                    "[$Computer] $Msg" | Write-MessageInfo -FGColor White
+                    
                     $Param_WP.CurrentOperation = $Msg
-                    Write-Verbose "[$Computer] $Msg"
                     Write-Progress @Param_WP
 
                     $Param_IC.ComputerName = $Computer
@@ -508,18 +550,18 @@ Process {
                         $Jobs += $Job
                     }
                     Else {
-                        $Results += Invoke-Command @Param_IC
+                        Invoke-Command @Param_IC
                     }
                 }
                 Catch {
                     $Msg = "Operation failed"
-                    If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
-                    $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                    If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
+                    "[$Computer] $Msg" | Write-MessageError
                 }
             }
             Else {
                 $Msg = "Operation cancelled by user"
-                $Host.UI.WriteErrorLine("[$Computer] $Msg")
+                "[$Computer] $Msg" | Write-MessageInfo -FGColor Cyan
             }
         
         } #end if proceeding with script
@@ -531,41 +573,32 @@ End {
     
     $Null = Write-Progress -Activity $Activity -Completed
 
-     If ($AsJob.IsPresent) {
+    If ($AsJob.IsPresent -and ($Jobs.Count -gt 0)) {
 
         If ($Jobs.Count -gt 0) {
-            $Msg = "$($Jobs.Count) job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output"
-            Write-Verbose $Msg
+            $Msg = "$($Jobs.Count) job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output`n"
+            "$Msg" | Write-MessageInfo -FGColor White -Title
             $Jobs | Get-Job
             
         }
         Else {
             $Msg = "No jobs created"
-            Write-Warning $Msg
+            $Msg | Write-MessageError
         }
     } #end if AsJob
 
-    Else {
-        If ($Results.Count -eq 0) {
-            $Msg = "No output returned"
-            Write-Warning $Msg
-        }
-        Else {
-            $Msg = "$($Results.Count) result(s) found"
-            Write-Verbose $Msg
-            Write-Output ($Results | Select -Property * -ExcludeProperty PSComputerName,RunspaceID)
-        }
-    }
+
+    $Msg = "END    : $Activity"
+    $Msg | Write-MessageInfo -FGColor Yellow -Title
+
+
 }
 
-} # end Do-SomethingCool
+} # end function
 
 
 '@
     
-    $Body = $Body.Replace("##AUTHOR##",$AuthorName)
-    $Body = $Body.Replace("##CREATEDATE##",(Get-Date -f yyyy-MM-dd))
-
     #endregion Here-string for function content    
 
     #region Splat
@@ -573,7 +606,7 @@ End {
     $Param_Snip = @{
         Title       = $SnippetName
         Description = $Description
-        Text        = $Body
+        Text        = $Null
         Author      = $Author
         Verbose     = $False
         ErrorAction = "Stop"
@@ -586,56 +619,94 @@ End {
 
     # What are we doing
     $Activity = "Create ISE Snippet '$SnippetName'"
-    $BGColor = $host.UI.RawUI.BackgroundColor
-    $Msg = "Action: $Activity"
-    $FGColor = "Yellow"
-    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
-    Else {Write-Verbose $Msg} 
+    $Msg = "BEGIN: $Activity"
+    "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor Yellow -Title
 }
 Process {
+    
+    
+    # See if it already exists
 
-    # Filename
-    $SnippetFile = $SnippetName +".snippets.ps1xml"
+    Write-Progress -Activity $Activity -Status $Env:ComputerName -CurrentOperation 'Test for existing snippet' -PercentComplete (1/3 * 100)
 
     If (($Test = Get-ISESnippet -ErrorAction SilentlyContinue | 
         Where-Object {$_.Name -eq $SnippetFile}) -and (-not $Force.IsPresent)) {
-            $Msg = "Snippet '$SnippetName' already exists; specify -Force to overwrite"
-            $Host.UI.WriteErrorLine("$Msg")
-            Write-Verbose ($Test | Out-String)
+            $Msg = "ERROR: Snippet '$SnippetName' already exists; specify -Force to overwrite"
+            "[$Env:ComputerName] $Msg" | Write-MessageError
+            ($Test | Out-String) | Write-MessageInfo -FGColor White
     }    
     
+    # Create it
     Else {
+        
+        Write-Progress -Activity $Activity -Status $Env:ComputerName -CurrentOperation 'Author name' -PercentComplete (2/3 * 100)
+        
+        If ($AuthorNameOption -eq "Autodetect") {
+        
+            If (-not ($AuthorName = GetFullName)) {
+                $Msg = "ERROR: Failed to match current username '$Env:UserName' to a full name using the Users path, WMI/registry; please set Author manually"
+                "[$Env:ComputerName] $Msg" | Write-MessageError
+                Break
+            }
+            Else {
+                $Msg = "Setting author to current user's full name, '$AuthorName'"
+                "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor Green
+            }
+        }
+        Else {
+            $AuthorName = $Author
+            $Msg = "Setting author name to '$AuthorName'"
+            "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor Green
+        }
+
+        #endregion Snippet info
+
+        Write-Progress -Activity $Activity -Status $Env:ComputerName -CurrentOperation 'Create new snippet' -PercentComplete (3/3 * 100)
+
         $ConfirmMsg = "`n`n`t$Activity`n`n"
-        If ($PSCmdlet.ShouldProcess($env:COMPUTERNAME,$ConfirmMsg)) {
+        If ($PSCmdlet.ShouldProcess($Env:COMPUTERNAME,$ConfirmMsg)) {
         
             Try {
                 
+                # Update here-string            
+                $SnippetBody = $Body.Replace("##AUTHOR##",$AuthorName)
+                $SnippetBody = $Body.Replace("##CREATEDATE##",(Get-Date -f yyyy-MM-dd))
+                $Param_Snip.Text = $SnippetBody
+
                 # Create snippet
                 $Create = New-IseSnippet @Param_Snip
 
+                # Verify it
                 If ($IsSuccess = Get-ISESnippet  -ErrorAction SilentlyContinue | 
                     Where-Object {($_.Name -eq $SnippetFile) -and ($_.CreationTime -lt (get-date))}) {
                     $Msg = "Snippet '$SnippetName' created successfully"
-                    Write-Verbose $Msg
+                    "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor Green
                     Write-Output $IsSuccess
                 }
                 Else {
-                    $Msg = "Failed to create snippet"
-                    If ($ErrorDetails = $_.Exception.Message) {$Msg = "; $ErrorDetails"}
-                    $Host.UI.WriteErrorLine($Msg)
+                    $Msg = "Failed to create snippet '$SnippetName'"
+                    If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
+                    "[$Env:ComputerName] $Msg" | Write-MessageError
                 }
             }
             Catch {
-                $Msg = "Error creating snippet"
-                If ($ErrorDetails = $_.Exception.Message) {$Msg = "; $ErrorDetails"}
-                $Host.UI.WriteErrorLine($Msg)
+                $Msg = "Error creating snippet '$SnippetName'"
+                If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
+                "[$Env:ComputerName] $Msg" | Write-MessageError
             }
         }
         Else {
             $Msg = "Snippet creation cancelled by user"
-            $Host.UI.WriteErrorLine($Msg)
+            "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor Cyan
         }
     }
+
+}
+End {
+    Write-Progress -Activity $Activity -Completed
+
+    $Msg = "END: $Activity"
+    "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor Yellow -Title
 
 }
 } #end New-PKISESnippetFunctionInvokeCommand
