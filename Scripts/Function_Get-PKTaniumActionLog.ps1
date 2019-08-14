@@ -343,7 +343,6 @@ Begin {
         Else {
             $Start = ($StartDate -as [datetime])
             $End = ($EndDate -as [datetime])
-            #$DateRange = ($EndDate -as [datetime]) - ($StartDate -as [datetime])
             If (-not ($End -ge $Start)) {
                 $Msg = "Time travel is not permitted; please enter an end date later than or equal to $(($StartDate -as [datetime]).ToString())"
                 Throw $Msg
@@ -358,18 +357,14 @@ Begin {
 
     $ScriptBlock = {
         
-        #Param($CustomFilePath,$Start,$End,$AllFiles,$ActionTypeFilter)
         Param($ArgList)
-
-        #If ($CustomFilePath) {
         If ($ArgList.CustomFilePath) {
             If (Test-Path $CustomFilePath -PathType Container -EA SilentlyContinue) {
 
                 Try {
-                    $ActionFile = Get-ChildItem -Name $CustomFilePath -Recurse -Include action-history*.txt -EA SilentlyContinue
+                    $ActionFile = Get-ChildItem $CustomFilePath -Recurse -Filter action-history*.txt -EA SilentlyContinue | Get-Item
                 }
                 Catch {
-                    #$Msg = "No Tanium client activity logfile found in path '$CustomFilePath"
                     $Msg = "No Tanium client activity logfile found in path '$($ArgList.CustomFilePath)'"
                 }
             }
@@ -378,20 +373,15 @@ Begin {
             }
         }
         Else {
-            Try {
                 
-                $TaniumCommandPath = "$($Env:SystemDrive)\Program Files*\Tanium\Tanium Client\taniumclient.exe"
+            $TaniumCommandPath = "$($Env:SystemDrive)\Program Files*\Tanium\Tanium Client\taniumclient.exe"
 
+            Try {
                 If ($Parent = Get-Command -Name $TaniumCommandPath | Select-Object $_.Path | Split-Path -Parent) {
-                    If ($ActionFile = $Parent | Get-ChildItem -Recurse -Include action-history*.txt -EA SilentlyContinue) {
-                        
-                    }
-                    Else {
-                        $Msg = "No Tanium Client action log file found in $($TaniumCommandPath | Select-Object $_.Path | Split-Path -Parent)"
-                    }
+                    $ActionFile = Get-ChildItem $Parent -Recurse -Filter action-history*.txt -EA SilentlyContinue | Get-Item
                 }
                 Else {
-                    $Msg = "Tanium Client path not found"
+                    $Msg = "No Tanium Client action log file found in $($TaniumCommandPath | Select-Object $_.Path | Split-Path -Parent)"
                 }
             }
             Catch {
@@ -406,7 +396,6 @@ Begin {
             If ($ActionFile.Count -gt 1 -and -not $AllFiles.IsPresent) {
                 $ActionFile = $ActionFile | Sort LastWriteTime -Descending | Select -First 1
             }
-
             Try { 
 
                 If ($LogContent = ($ActionFile | Get-Content -Raw -ErrorAction SilentlyContinue)) {       
