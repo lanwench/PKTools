@@ -304,7 +304,7 @@ Param (
 Begin { 
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "20.00.0000"
+    [version]$Version = "02.00.0000"
 
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
