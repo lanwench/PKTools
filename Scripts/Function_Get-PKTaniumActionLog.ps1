@@ -6,6 +6,8 @@ Function Get-PKTaniumActionLog {
 
 .DESCRIPTION
     Invokes a scriptblock to parse content from the Tanium client action log, returning a PSObject
+    Allows for filtering on action type (via regex) and by start/end date
+    Allows for selection of only most recent log file
     Accepts pipeline input
     Optionally tests connectivity to remote computers before invoking scriptblock
     Returns a PSobject or PSJob
@@ -14,18 +16,31 @@ Function Get-PKTaniumActionLog {
     Name    : Get-PKTaniumActionLog.ps1
     Created : 2019-06-19
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 02.00.0000
     History :
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
         
         v01.00.0000 - 2019-06-19 - Created script
+        v02.00.0000 - 2019-08-13 - Added parameters for date, action type, handling for multiple action files
 
 .PARAMETER ComputerName
     One or more computer names (default is local computer)
 
 .PARAMETER CustomFilePath
     Absolute path to Tanium client action logfile (default is to look for action-history text file in c:\Program Files (x86)\Tanium\Tanium Client\Logs)
+
+.PARAMETER AllFiles
+    Include all discovered action-history log files (default is the most recently written to)
+
+.PARAMETER ActionTypeFilter
+    Return only actions where the filter string matches an action type (default is no filter)
+
+.PARAMETER StartDate
+    Start date (default is earliest in logs)
+
+.PARAMETER EndDate
+    End date (default is now)
 
 .PARAMETER Credential
     Valid credentials on target (default is passthrough)
@@ -50,78 +65,155 @@ Function Get-PKTaniumActionLog {
 
         VERBOSE: PSBoundParameters: 
 	
-        Key            Value                                    
-        ---            -----                                    
-        Verbose        True                                     
-        ComputerName   WORKSTATION11                          
-        CustomFilePath                                          
-        Credential     System.Management.Automation.PSCredential
-        AsJob          False                                    
-        JobPrefix      TaniumActivity                           
-        ConnectionTest WinRM                                    
-        NoProgress     False                                    
-        Quiet          False                                    
-        ScriptName     Get-PKTaniumActionLog                  
-        ScriptVersion  1.0.0                                    
-        PipelineInput  False                                    
+        Key              Value                                    
+        ---              -----                                    
+        Verbose          True                                     
+        ComputerName     LAPTOP                          
+        CustomFilePath                                            
+        AllFiles         False                                    
+        ActionTypeFilter                                          
+        StartDate                                                 
+        EndDate          2019-08-13 04:01:13 PM                   
+        Credential       System.Management.Automation.PSCredential
+        AsJob            False                                    
+        JobPrefix        TaniumActivity                           
+        ConnectionTest   WinRM                                    
+        NoProgress       False                                    
+        Quiet            False                                    
+        ScriptName       Get-PKTaniumActionLog                    
+        ScriptVersion    1.1.0                                    
+        PipelineInput    False                                    
 
-        BEGIN  : Get Tanium Client action log content
+        BEGIN  : Get content of latest Tanium Client action log
 
-        [WORKSTATION11] Invoke command
+        [LAPTOP] Invoke command
 
-        Computername : WORKSTATION11
-        Date         : 2019-06-21 11:28:13 AM
-        ActionID     : 1070371
-        Action       : Deploy - Maintenance Window 1
-        Message      : completed in 0.161 seconds with exit code 0
+        Computername : LAPTOP
+        Date         : 2019-06-27 12:22:38 AM
+        ActionID     : 1102636
+        Action       : Patch - Maintenance Window 38
+        Message      : completed in 0.118 seconds with exit code 0
 
-        Computername : WORKSTATION11
-        Date         : 2019-06-21 11:28:13 AM
-        ActionID     : 1070371
-        Action       : Deploy - Maintenance Window 1
-        Message      : executing: cmd /c xcopy /y maintenance_window_1.json ..\..\Tools\Deploy\maintenance_windows\
+        Computername : LAPTOP
+        Date         : 2019-06-27 12:24:48 AM
+        ActionID     : 1102644
+        Action       : Patch - Scan Configuration 2
+        Message      : executing: cmd /c xcopy /y scan-configuration-2.xml ..\..\Patch\scans\configurations\
 
-        Computername : WORKSTATION11
-        Date         : 2019-06-21 11:27:27 AM
-        ActionID     : 1070369
-        Action       : Patch - Patch Lists - Windows
-        Message      : completed in 0.237 seconds with exit code 0
+        Computername : LAPTOP
+        Date         : 2019-06-27 12:25:42 AM
+        ActionID     : 1102652
+        Action       : Patch - Blacklist 3
+        Message      : completed in 0.113 seconds with exit code 0
 
-        Computername : WORKSTATION11
-        Date         : 2019-06-21 11:27:27 AM
-        ActionID     : 1070369
-        Action       : Patch - Patch Lists - Windows
-        Message      : executing: cmd /c xcopy /y patch-lists ..\..\Patch\
-
-        Computername : WORKSTATION11
-        Date         : 2019-06-21 11:25:51 AM
-        ActionID     : 1070365
+        Computername : LAPTOP
+        Date         : 2019-06-27 12:25:58 AM
+        ActionID     : 1102653
         Action       : Deploy - Profile 2
-        Message      : completed in 1.123 seconds with exit code 0
+        Message      : executing: cmd /c xcopy /y profile_2.json ..\..\Tools\Deploy\profiles\
+
+        Computername : LAPTOP
+        Date         : 2019-06-27 12:27:38 AM
+        ActionID     : 1102659
+        Action       : Patch - Patch Lists - Windows
+        Message      : completed in 0.132 seconds with exit code 0
 
         <snip>
 
-        END    : Get Tanium Client action log content
+        END    : Get content of latest Tanium Client action log
+
 
 .EXAMPLE
-    PS C:\> Get-PKTaniumActionLog -ComputerName sqlserver.domain.local -Credential $Credential -NoProgress -Quiet -AsJob
+    PS C:\> Get-PKTaniumActionLog -ComputerName Test-VM.domain.local -Credential $Credential -StartDate 2019-08-01 -EndDate (get-Date).AddDays(-1) -AsJob -Verbose
+
+        VERBOSE: PSBoundParameters: 
+	
+        Key                      Value                                    
+        ---                      -----                                    
+        StartDate                2019-08-01                               
+        EndDate                  2019-08-12 02:48:02 PM                   
+        AsJob                    True                                     
+        Verbose                  True                                     
+        ComputerName             Test-VM                          
+        CustomFilePath                                                    
+        AllFiles False                                    
+        Credential               System.Management.Automation.PSCredential
+        JobPrefix                TaniumActivity                           
+        ConnectionTest           WinRM                                    
+        NoProgress               False                                    
+        Quiet                    False                                    
+        ScriptName               Get-PKTaniumActionLog                    
+        ScriptVersion            1.1.0                                    
+        PipelineInput            False                                    
+
+        BEGIN  : Get content of latest Tanium Client action log between 2019-08-01 12:00:00 AM and 2019-08-12 02:48:02 PM (as job)
+
+        [Test-VM] Test WinRM connection
+        [Test-VM] Invoke command as PSJob
+
+        1 job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output
 
         Id     Name            PSJobTypeName   State         HasMoreData     Location             Command                  
         --     ----            -------------   -----         -----------     --------             -------                  
-        17     TaniumActivi... RemoteJob       Completed     True            sqlserver.domain.... ...                      
+        6      TaniumActivi... RemoteJob       Running       True            Test-VM      ...                      
 
+        END    : Get content of latest Tanium Client action log between 2019-08-01 12:00:00 AM and 2019-08-12 02:48:02 PM (as job)
 
-        C:\> $ Get-Job 17 | Receive-Job
+        PS C:\> Get-Job 6 | Wait-Job | Receive-Job | Select -First 4
 
+        Computername   : Test-VM
+        Date           : 2019-08-01 12:02:01 AM
+        ActionID       : 1333771
+        Action         : Detect Intel for Windows Revision 718 Sync
+        Message        : executing: cmd /c cscript /nologo run-add-intel-package.vbs 2>&1
+        PSComputerName : Test-VM
+        RunspaceId     : f18779a8-7cc3-4754-8ae7-3d1ce58c7d23
 
-        Computername   : SQLSERVER
-        Date           : -
-        ActionID       : -
-        Action         : -
-        Message        : No Tanium Client action log file found in C:\Program Files*\Tanium\Tanium Client
-        PSComputerName : sqlserver.domain.local
-        RunspaceId     : 8f66ec17-900d-4719-910c-6344abccb5ea
+        Computername   : Test-VM
+        Date           : 2019-08-01 12:02:02 AM
+        ActionID       : 1333771
+        Action         : Detect Intel for Windows Revision 718 Sync
+        Message        : completed in 0.407 seconds with exit code 0
+        PSComputerName : Test-VM
+        RunspaceId     : f18779a8-7cc3-4754-8ae7-3d1ce58c7d23
 
+        Computername   : Test-VM
+        Date           : 2019-08-01 01:10:20 AM
+        ActionID       : 1333799
+        Action         : Patch - Maintenance Window 1
+        Message        : executing: cmd /c xcopy /y maintenance-window-1.xml ..\..\Patch\maintenance-windows\configurations\
+        PSComputerName : Test-VM
+        RunspaceId     : f18779a8-7cc3-4754-8ae7-3d1ce58c7d23
+
+        Computername   : Test-VM
+        Date           : 2019-08-01 01:10:20 AM
+        ActionID       : 1333799
+        Action         : Patch - Maintenance Window 1
+        Message        : completed in 0.218 seconds with exit code 0
+        PSComputerName : Test-VM
+        RunspaceId     : f18779a8-7cc3-4754-8ae7-3d1ce58c7d23
+
+.EXAMPLE    
+    PS C:\> Get-PKTaniumActionLog -AllFiles -StartDate 2019-05-02 -EndDate 2019-05-10 -ActionType Patch -AsJob -JobPrefix Foo -Quiet
+
+        Id     Name            PSJobTypeName   State         HasMoreData     Location        Command                  
+        --     ----            -------------   -----         -----------     --------        -------                  
+        27     Foo-PROD-SQL... RemoteJob       Running       True            PROD-SQL-A      ...                      
+
+        PS C:\> Get-Job 27 | Wait-Job | Receive-Job | Select -First 10 | Format-Table -AutoSize
+
+        Computername    Date                   ActionID Action                        Message                                                        
+        ------------    ----                   -------- ------                        -------                                                        
+        PROD-SQL-A      2019-07-31 10:48:01 AM 1329750  Patch - Maintenance Window 1  executing: cmd /c xcopy /y maintenance-window-1.xml ..\..\Pa...
+        PROD-SQL-A      2019-07-31 10:48:02 AM 1329750  Patch - Maintenance Window 1  completed in 1.015 seconds with exit code 0...                 
+        PROD-SQL-A      2019-07-31 10:48:02 AM 1329791  Patch - Maintenance Window 35 executing: cmd /c xcopy /y maintenance-window-35.xml ..\..\P...
+        PROD-SQL-A      2019-07-31 10:48:02 AM 1329791  Patch - Maintenance Window 35 completed in 0.334 seconds with exit code 0...                 
+        PROD-SQL-A      2019-07-31 10:48:02 AM 1329794  Patch - Blacklist 1           executing: cmd /c xcopy /y blacklist-1.xml ..\..\Patch\black...
+        PROD-SQL-A      2019-07-31 10:48:02 AM 1329794  Patch - Blacklist 1           completed in 0.342 seconds with exit code 0...                 
+        PROD-SQL-A      2019-07-31 10:48:02 AM 1329824  Patch - Maintenance Window 38 executing: cmd /c xcopy /y maintenance-window-38.xml ..\..\P...
+        PROD-SQL-A      2019-07-31 10:48:03 AM 1329824  Patch - Maintenance Window 38 completed in 0.285 seconds with exit code 0...                 
+        PROD-SQL-A      2019-07-31 10:48:03 AM 1329834  Patch - Scan Configuration 2  executing: cmd /c xcopy /y scan-configuration-2.xml ..\..\Pa...
+        PROD-SQL-A      2019-07-31 10:48:03 AM 1329834  Patch - Scan Configuration 2  completed in 0.424 seconds with exit code 0...                 
 
 #> 
 
@@ -147,6 +239,30 @@ Param (
     )]
     [ValidateNotNullOrEmpty()]
     [string] $CustomFilePath,
+
+    [Parameter(
+        HelpMessage = "Include all discovered action-history log files (default is the most recently written to)"
+    )]
+    [Switch] $AllFiles,
+
+    [Parameter(
+        HelpMessage = "Return only actions where the filter string matches an action type (default is no filter)"
+    )]
+    [ValidateNotNullOrEmpty()]
+    [ValidateSet("Asset","Clean","Collect","Comply","Delete","Deploy","Detect","End-User","Execute","Patch","Run","UserGroupTagging","Trace","Windows")]
+    [string] $ActionTypeFilter,
+
+    [Parameter(
+        HelpMessage = "Start date (default is earliest in logs)"
+    )]
+    #[ValidateNotNullOrEmpty()]
+    $StartDate,
+
+    [Parameter(
+        HelpMessage = "End date (default is now)"
+    )]
+    #[ValidateNotNullOrEmpty()]
+    $EndDate = [System.DateTime]::Now,
 
     [Parameter(
         HelpMessage = "Valid credentials on target (default is passthrough)"
@@ -188,7 +304,7 @@ Param (
 Begin { 
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "20.00.0000"
 
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
@@ -207,27 +323,54 @@ Begin {
     $CurrentParams.Add("PipelineInput",$PipelineInput)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
-    # Preferences 
+    #region Preferences 
+    
     $ErrorActionPreference = "Stop"
     Switch ($NoProgress) {
         $True  {$ProgressPreference = "SilentlyContinue"}
         $False {$ProgressPreference = "Continue"}
     }
+
+    #endregion Preferences
     
-    
+    #region Parameter things
+
+    If ($StartDate -and $EndDate) {
+        If (-not ($StartDate -as [datetime]) -or -not ($EndDate -as [datetime])) {
+            $Msg = "Please enter a valid start date"
+            Throw $Msg
+        }
+        Else {
+            $Start = ($StartDate -as [datetime])
+            $End = ($EndDate -as [datetime])
+            #$DateRange = ($EndDate -as [datetime]) - ($StartDate -as [datetime])
+            If (-not ($End -ge $Start)) {
+                $Msg = "Time travel is not permitted; please enter an end date later than or equal to $(($StartDate -as [datetime]).ToString())"
+                Throw $Msg
+            }
+        }
+    }
+    Else {$StartDate = $EndDate = ""}
+
+    #endregion Parameter things
+
     #region Scriptblock for Invoke-Command
 
     $ScriptBlock = {
         
-        Param($CustomFilePath)
+        #Param($CustomFilePath,$Start,$End,$AllFiles,$ActionTypeFilter)
+        Param($ArgList)
 
-        If ($CustomFilePath) {
+        #If ($CustomFilePath) {
+        If ($ArgList.CustomFilePath) {
             If (Test-Path $CustomFilePath -PathType Container -EA SilentlyContinue) {
+
                 Try {
-                    $InputFile = Get-ChildItem $CustomFilePath -Include *.txt -EA SilentlyContinue | Where-Object {$_.Name -match "action-history.\.txt"}
+                    $ActionFile = Get-ChildItem -Name $CustomFilePath -Recurse -Include action-history*.txt -EA SilentlyContinue
                 }
                 Catch {
-                    $Msg = "No Tanium client activity logfile found in path '$CustomFilePath"
+                    #$Msg = "No Tanium client activity logfile found in path '$CustomFilePath"
+                    $Msg = "No Tanium client activity logfile found in path '$($ArgList.CustomFilePath)'"
                 }
             }
             Else {
@@ -236,10 +379,12 @@ Begin {
         }
         Else {
             Try {
+                
                 $TaniumCommandPath = "$($Env:SystemDrive)\Program Files*\Tanium\Tanium Client\taniumclient.exe"
+
                 If ($Parent = Get-Command -Name $TaniumCommandPath | Select-Object $_.Path | Split-Path -Parent) {
-                    If ($ActionFile = $Parent | Get-ChildItem -Recurse -Include *.txt -EA SilentlyContinue | Where-Object {$_.Name -match "action-history.\.txt"}) {
-                        $InputFile = $ActionFile.FullName
+                    If ($ActionFile = $Parent | Get-ChildItem -Recurse -Include action-history*.txt -EA SilentlyContinue) {
+                        
                     }
                     Else {
                         $Msg = "No Tanium Client action log file found in $($TaniumCommandPath | Select-Object $_.Path | Split-Path -Parent)"
@@ -254,56 +399,93 @@ Begin {
                 If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
             }
         }
-        Try {
-            If ($Null = Get-Item $InputFile -EA SilentlyContinue) {
+        
+        If ($ActionFile) {
+            
+            # If there's more than one, and we didn't want all
+            If ($ActionFile.Count -gt 1 -and -not $AllFiles.IsPresent) {
+                $ActionFile = $ActionFile | Sort LastWriteTime -Descending | Select -First 1
+            }
 
-                Try { 
+            Try { 
 
-                    If ($LogContent = Get-Content $InputFile -Raw -ErrorAction SilentlyContinue) {       
+                If ($LogContent = ($ActionFile | Get-Content -Raw -ErrorAction SilentlyContinue)) {       
                     
-                        # Thanks for the regex help, Jeffery Hicks!
-                        [regex]$rx = "(?<Date>\d{4}.*Z).*Action\s(?<ActionID>\d+).*\s+\[(?<Action>.*)\]:\s+(?<Message>.*)"
+                    # Thanks for the regex help, Jeffery Hicks!
+                    [regex]$rx = "(?<Date>\d{4}.*Z).*Action\s(?<ActionID>\d+).*\s+\[(?<Action>.*)\]:\s+(?<Message>.*)"
                     
-                        If ($M = $rx.Matches($LogContent)) {
-                            $Output = @()
-                            $Output += Foreach ($item in $m) {
-                                [pscustomobject]@{
-                                    Computername = $env:Computername
-                                    Date         = $item.groups[1].Value -as [datetime]
-                                    ActionID     = $item.groups[2].value
-                                    Action       = $item.groups[3].value
-                                    Message      = $item.groups[4].value
-                                }
+                    If ($M = $rx.Matches($LogContent)) {
+                        $Output = @()
+                        $Output += Foreach ($item in $m) {
+                            [pscustomobject]@{
+                                Computername = $env:Computername
+                                Date         = $item.groups[1].Value -as [datetime]
+                                ActionID     = $item.groups[2].value
+                                Action       = $item.groups[3].value
+                                Message      = $item.groups[4].value
                             }
-                        }
-                        Else {
-                            $Msg = "No match found in $InputFile"
                         }
                     }
                     Else {
-                        $Msg = "Failed to get content in $InputFile"
+                        $Msg = "No match found in $($ActionFile.FullName -join(", "))"
                     }
                 }
-                Catch {
-                    $Msg = "Something horrible has happened!"
-                    If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
+                Else {
+                    $Msg = "Failed to get content in $($ActionFile.FullName -join(", "))"
                 }
+            } #end try getting content
+            Catch {
+                $Msg = "Something horrible has happened!"
+                If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
             }
-        }
-        Catch {}
+        } #end if input file
             
         If (-not $Output) {
             $Output = [pscustomobject]@{
-                Computername = $env:Computername
+                Computername = $Env:Computername
                 Date         = "-"
                 ActionID     = "-"
                 Action       = "-"
                 Message      = $Msg
             }
         }
+        Else {
+            
+            # Filter by date and/or action type
+            #If ($ActionTypeFilter) {
+            If ($ArgList.ActionTypeFilter) {
+                If (-not ($Output = $Output | Where-Object {$_.Action -match "^$($ArgList.ActionTypeFilter)"})) {
+                    #$Msg = "No results found with action filter matching '^$ActionTypeFilter')"
+                    $Msg = "No results found with action filter matching '^$($ArgList.ActionTypeFilter)')"
+                    $Output = [pscustomobject]@{
+                        Computername = $Env:Computername
+                        Date         = "-"
+                        ActionID     = "-"
+                        Action       = "-"
+                        Message      = $Msg
+                    }
+                }
+            }
+            #If ($Start -and $End) {
+            If ($ArgList.Start -and $ArgList.End) {
+                If (-not ($Output = $Output | Where-Object {($_.Date -gt $ArgList.Start) -and ($_.Date -lt $ArgList.End)})) {
+                    $Msg = "No results found between $($ArgList.Start.ToString()) and $($ArgList.End.ToString())"
+                    $Output = [pscustomobject]@{
+                        Computername = $Env:Computername
+                        Date         = "-"
+                        ActionID     = "-"
+                        Action       = "-"
+                        Message      = $Msg
+                    }
+                }
+            }
+        }
+        
+        # All done!
         Write-Output $Output | Select-Object ComputerName,Date,ActionID,Action,Message
-    } #end scriptblock
 
+    } #end scriptblock
+    
     #endregion Scriptblock for Invoke-Command
 
     #region Functions
@@ -357,8 +539,45 @@ Begin {
 
     #region Splats
 
+    # Hashtable for scriptblock params
+    $ArgList = @{}
+    $ArgList = @{
+        CustomFilePath   = $CustomFilePath
+        Start            = $Start
+        End              = $EndDate
+        ActionTypeFilter = $ActionTypeFilter
+    }
+
+    # Splat for Invoke-Command
+    $Param_IC = @{}
+    $Param_IC = @{
+        ComputerName   = $Null
+        Authentication = "Kerberos"
+        ScriptBlock    = $ScriptBlock
+        ArgumentList   = $ArgList
+        Credential     = $Credential
+        ErrorAction    = "Stop"
+        Verbose        = $False
+    }
+    If ($AsJob.IsPresent) {
+        $Jobs = @()
+        $Param_IC.Add("AsJob",$True)
+        $Param_IC.Add("JobName",$Null)
+    }
+
     # Splat for Write-Progress
-    $Activity = "Get Tanium Client action log content"
+    If ($AllFiles.IsPresent) {
+        $Activity = "Get content of all discovered Tanium Client action logs"    
+    }
+    Else {
+        $Activity = "Get content of latest Tanium Client action log"    
+    }
+    If ($ActionTypeFilter) {
+        $Activity += " matching action '^$ActionTypeFilter'"
+    }
+    If ($Start -and $End) {
+        $Activity += " between $($Start.ToString()) and $($End.ToString())"
+    }
     If ($AsJob.IsPresent) {
         $Activity = "$Activity (as job)"
     }
@@ -369,26 +588,7 @@ Begin {
         Status           = "Working"
         PercentComplete  = $Null
     }
-
-    # Parameters for Invoke-Command
     $ConfirmMsg = $Activity
-    $Param_IC = @{}
-    $Param_IC = @{
-        ComputerName   = $Null
-        Authentication = "Kerberos"
-        ScriptBlock    = $ScriptBlock
-        Credential     = $Credential
-        ErrorAction    = "Stop"
-        Verbose        = $False
-    }
-    If ($CurrentParams.CustomFilePath) {
-        $Param_IC.Add("ArgumentList",$CustomFilePath)
-    }
-    If ($AsJob.IsPresent) {
-        $Jobs = @()
-        $Param_IC.Add("AsJob",$True)
-        $Param_IC.Add("JobName",$Null)
-    }
     
     #endregion Splats
 
