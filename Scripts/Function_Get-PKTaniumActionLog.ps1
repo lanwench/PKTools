@@ -441,10 +441,8 @@ Begin {
         Else {
             
             # Filter by date and/or action type
-            #If ($ActionTypeFilter) {
             If ($ArgList.ActionTypeFilter) {
                 If (-not ($Output = $Output | Where-Object {$_.Action -match "^$($ArgList.ActionTypeFilter)"})) {
-                    #$Msg = "No results found with action filter matching '^$ActionTypeFilter')"
                     $Msg = "No results found with action filter matching '^$($ArgList.ActionTypeFilter)')"
                     $Output = [pscustomobject]@{
                         Computername = $Env:Computername
@@ -455,7 +453,6 @@ Begin {
                     }
                 }
             }
-            #If ($Start -and $End) {
             If ($ArgList.Start -and $ArgList.End) {
                 If (-not ($Output = $Output | Where-Object {($_.Date -gt $ArgList.Start) -and ($_.Date -lt $ArgList.End)})) {
                     $Msg = "No results found between $($ArgList.Start.ToString()) and $($ArgList.End.ToString())"
@@ -729,5 +726,6 @@ End {
 
 }
 
-} # end function
+} # end Get-PKTaniuamActionLog
+
 
