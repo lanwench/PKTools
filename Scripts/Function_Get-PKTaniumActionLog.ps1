@@ -271,6 +271,18 @@ Param (
     [pscredential] $Credential = [System.Management.Automation.PSCredential]::Empty,
 
     [Parameter(
+        HelpMessage = "WinRM authentication mechanism: Kerberos, Basic, Negotiate, Default (default is Negotiate)"
+    )]
+    [ValidateSet('Kerberos','Basic','Negotiate','Default','CredSSP')]
+    [string]$Authentication = "Negotiate",
+
+    [Parameter(
+        HelpMessage = "Options to test connectivity on remote computer prior to Invoke-Command - WinRM, ping, or none (default is WinRM)"
+    )]
+    [ValidateSet("WinRM","Ping","None")]
+    [string] $ConnectionTest = "WinRM",
+
+    [Parameter(
         ParameterSetName = "Job",
         HelpMessage = "Run Invoke-Command scriptblock as PSJob"
     )]
@@ -281,12 +293,6 @@ Param (
         HelpMessage = "Prefix for job name (default is 'TaniumActivity')"
     )]
     [String] $JobPrefix = "TaniumActivity",
-
-    [Parameter(
-        HelpMessage = "Options to test connectivity on remote computer prior to Invoke-Command - WinRM with Kerberos, ping, or none (default is WinRM)"
-    )]
-    [ValidateSet("WinRM","Ping","None")]
-    [string] $ConnectionTest = "WinRM",
 
     [Parameter(
         HelpMessage = "Don't display progress bar (can improve performance with large files)"
@@ -502,7 +508,7 @@ Begin {
         $Param_WSMAN = @{
             ComputerName   = $Computer
             Credential     = $Credential
-            Authentication = "Kerberos"
+            Authentication = $Authentication
             ErrorAction    = "Silentlycontinue"
             Verbose        = $False
         }
@@ -538,7 +544,7 @@ Begin {
     $Param_IC = @{}
     $Param_IC = @{
         ComputerName   = $Null
-        Authentication = "Kerberos"
+        Authentication = $Authentication
         ScriptBlock    = $ScriptBlock
         ArgumentList   = $ArgList
         Credential     = $Credential
