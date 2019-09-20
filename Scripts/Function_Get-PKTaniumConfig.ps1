@@ -7,7 +7,7 @@ Function Get-PKTaniumConfig {
 .DESCRIPTION
     Invokes a scriptblock to get Tanium client config details, interactively or as a PSJob
     Accepts pipeline input
-    Optionally tests connectivity to remote computers before invoking scriptblock
+    Optionally tests connectivity to remote computers before invoking scriptblock, via ping or WSMAN
     Returns a PSobject or PSJob
 
 .NOTES        
@@ -43,7 +43,96 @@ Function Get-PKTaniumConfig {
     Hide all non-verbose console output
 
 .EXAMPLE
-    PS C:\> 
+    PS C:\> Get-PKTaniumConfig -Verbose
+
+        VERBOSE: PSBoundParameters: 
+	
+        Key            Value                                    
+        ---            -----                                    
+        Verbose        True                                     
+        ComputerName   LAPTOP                          
+        Authentication Negotiate                                
+        Credential     System.Management.Automation.PSCredential
+        AsJob          False                                    
+        JobPrefix      Tanium                                   
+        ConnectionTest WinRM                                    
+        Quiet          False                                    
+        ScriptName     Get-PKTaniumConfig                       
+        ScriptVersion  1.0.0                                    
+        PipelineInput  False                                    
+
+        BEGIN  : Invoke scriptblock to get Tanium Client configuration
+
+        [LAPTOP] Invoke command
+
+
+        ComputerName    : LAPTOP
+        FQDN            : LAPTOP.internal.megacorp.net
+        TaniumInstalled : True
+        Path            : C:\Program Files (x86)\Tanium\Tanium Client\TaniumClient.exe
+        Version         : 7.2.314.3518
+        ServerName      : 209.61.42.213
+        ServerNameList  : mtview-3.service.megacorp.net,209.61.42.213
+        ServerPort      : 17472
+        FirstInstall    : 18/12/2018 14:33:10
+        ComputerID      : 41213866
+        Tags            : {LI_test, patching_maintwin9}
+        ServiceState    : Running
+        Messages        : 
+        PSComputerName  : LAPTOP
+        RunspaceId      : 5f9733e0-ea9e-435b-aef9-df82b7114edd
+
+        END    : Invoke scriptblock to get Tanium Client configuration
+
+.EXAMPLE
+    PS C:\> Get-PKTaniumConfig -ComputerName webtest.internal.megacorp.net -Credential $Credential -Authentication Kerberos -AsJob -Verbose
+
+        VERBOSE: PSBoundParameters: 
+	
+        Key            Value                                    
+        ---            -----                                    
+        ComputerName   {webtest.internal.megacorp.net}
+        Credential     System.Management.Automation.PSCredential
+        Authentication Kerberos                                 
+        AsJob          True                                     
+        Verbose        True                                     
+        JobPrefix      Tanium                                   
+        ConnectionTest WinRM                                    
+        Quiet          False                                    
+        ScriptName     Get-PKTaniumConfig                       
+        ScriptVersion  1.0.0                                    
+        PipelineInput  False                                    
+
+        BEGIN  : Invoke scriptblock to get Tanium Client configuration (as job)
+
+        [webtest.internal.megacorp.net] Test WinRM connection
+        [webtest.internal.megacorp.net] Invoke command as PSJob
+
+        1 job(s) created; run 'Get-Job -Id # | Wait-Job | Receive-Job' to view output
+
+        Id     Name            PSJobTypeName   State         HasMoreData     Location             Command               
+        --     ----            -------------   -----         -----------     --------             -------               
+        2      Tanium_webte... RemoteJob       Running       True            webtest.internal.... ...                   
+
+        END    : Invoke scriptblock to get Tanium Client configuration (as job)
+
+        PS C:\> Get-Job 2 | Receive-Job
+
+        ComputerName    : WEBTEST
+        FQDN            : WEBTEST.internal.megacorp.net
+        TaniumInstalled : True
+        Path            : C:\Program Files (x86)\Tanium\Tanium Client\TaniumClient.exe
+        Version         : 7.2.314.3518
+        ServerName      : sandiego-1.service.megacorp.net
+        ServerNameList  : sandiego-1.service.megacorp.net,187.201.32.87
+        ServerPort      : 17472
+        FirstInstall    : 25/03/2019 13:57:44
+        ComputerID      : 1237330394
+        Tags            : {web_iis, patching_dev}
+        ServiceState    : Running
+        Messages        : 
+        PSComputerName  : webtest.internal.megacorp.net
+        RunspaceId      : 808292e8-80b6-4c56-8727-6f430906dc85
 
 #> 
 
@@ -223,13 +312,11 @@ Begin {
         Else {Write-Verbose "$Message"}
     }
 
-    # Function to write an error or a verbose message
+    # Function to write an error, without the stacktrace
     Function Write-MessageError {
         [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message)#,[switch]$Quiet = $Quiet)
-        $BGColor = $host.UI.RawUI.BackgroundColor
-        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("$Message")}
-        Else {Write-Verbose "$Message"}
+        Param([Parameter(ValueFromPipeline)]$Message)
+        $Host.UI.WriteErrorLine("$Message")
     }
 
     # Function to test WinRM connectivity
@@ -457,5 +544,5 @@ End {
 
 }
 
-} # end function
+} # end Get-PKTaniumConfig
 
