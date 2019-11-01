@@ -12,7 +12,7 @@ Function Set-PKWindowsExplorerPreview {
     Name    : Function_Set-PKWindowsExplorerPreview.ps1
     Author  : Paula Kingsley
     Created : 2017-08-22
-    Version : v01.01.0000
+    Version : v01.03.0000
     History:
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK
@@ -21,6 +21,7 @@ Function Set-PKWindowsExplorerPreview {
         v01.01.0000 - 2019-03-11 - Fixed erroneous Win10 message, other general updates
         v01.02.0000 - 2019-06-11 - Renamed to Set-PKWindowsExplorerPreview, fixed issue where it ...
                                    um...didn't actually do anything to change settings.
+        v01.03.0000 - 2019-10-22 - Fixed issue with write-progress splat
         
 .LINK
     https://blogs.technet.microsoft.com/bshukla/2010/03/30/script-to-enable-preview-pane-for-powershell-scripts/
@@ -156,7 +157,7 @@ Param(
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.02.0000"
+    [version]$Version = "01.03.0000"
 
     
     # Show our settings
@@ -194,13 +195,12 @@ Begin {
         Else {Write-Verbose "$Message"}
     }
 
-    # Function to write an error or a verbose message
+    # Function to write an error (as a string, no stacktrace)
     Function Write-MessageError {
         [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message)#,[switch]$Quiet = $Quiet)
-        $BGColor = $host.UI.RawUI.BackgroundColor
-        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("$Message")}
-        Else {Write-Verbose "$Message"}
+        Param([Parameter(ValueFromPipeline)]$Message)       
+        $Host.UI.WriteErrorLine("$Message")
+        
     }
 
     # Function to check if PowerShell is running in elevated mode
@@ -234,48 +234,6 @@ Begin {
         $Msg = "[Prerequisites] PowerShell must be running in Elevated mode; please re-launch as Administrator"
 
     }
-
-    #[Switch]$Continue = $False
-    <#
-    If (-not $SkipOSVersionCheck.IsPresent) {
-        $Msg = "Checking OS version compatibility"    
-        Write-Verbose "[Prerequisites] $Msg"
-        
-        Try {
-            $OS = (Get-WmiObject -Class win32_OperatingSystem @StdParams).caption
-            switch -wildcard ($OS){
-                "*Windows 7*" {
-                    $Msg = "Verified OS $OS"
-                    Write-Verbose "[Prerequisites] $Msg"
-                    $Null = Test-Elevated
-                    $Continue = $True
-                }
-                "*Windows Server 2008 R2*" {
-                    $Msg = "Verified OS $OS"
-                    Write-Verbose "[Prerequisites] $Msg"
-                    $Null = Test-Elevated
-                    $Continue = $True
-                }
-                default {
-                    $Msg = "$Env:ComputerName is running $OS. This function requires Windows 7 or Windows Server 2008 R2. "
-                    $Host.UI.WriteErrorLine("ERROR  : [Prerequisites] $Msg")
-                    Break
-                }
-            }
-        }
-        Catch {
-            $Msg = "OS version test failed"
-            $ErrorDetails = $_.Exception.Message
-            $Host.UI.WriteErrorLine("ERROR: $Msg`n$ErrorDetails")
-            Break
-        }
-    }
-    Else {$Continue = $True}
-
-    If (-not $Continue.IsPresent) {
-        Break
-    }
-    #>
 
     #endregion Prerequisites
 
@@ -316,8 +274,8 @@ Begin {
 
     # Splat for Write-Progress
     $Activity = "Add file extension to Windows Explorer preview pane"
-    $Param_WP1 = @{}
-    $Param_WP1 = @{
+    $Param_WP = @{}
+    $Param_WP = @{
         Activity         = $Activity
         CurrentOperation = $Null
         Status           = $Null

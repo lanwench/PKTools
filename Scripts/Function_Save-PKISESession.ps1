@@ -11,13 +11,14 @@ Function Save-PKISESession{
     Name    : Function_Save-PKISESession.ps1
     Created : 2016-05-29
     Author  : Paula Kingsley
-    Version : 02.00.000
+    Version : 02.01.000
     History :
     
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v1.0.0     - 2016-05-29 - Created script based on links
-        v02.0.0000 - 2018-02-14 - Updated with default path, standardization, changed force to noclobber
+        v1.0.0      - 2016-05-29 - Created script based on links
+        v02.00.0000 - 2018-02-14 - Updated with default path, standardization, changed force to noclobber
+        v02.01.0000 - 2019-10-08 - Minor cosmetic updates
         
 .LINK
     https://itfordummies.net/2014/10/27/save-restore-powershell-ise-opened-scripts/
@@ -63,7 +64,6 @@ Function Save-PKISESession{
 Param(
     [Parameter(
         Position=0,
-        Mandatory = $False,
         HelpMessage = "Output file for session storage (will be created if nonexistent)"
     )]
     [ValidateNotNullOrEmpty()]
@@ -79,7 +79,7 @@ Param(
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "02.00.0000"
+    [version]$Version = "02.01.0000"
 
     # Show our settings
     $CurrentParams = $PSBoundParameters
@@ -137,7 +137,7 @@ Process{
         }
         Catch {
             $Msg = "Operation failed"
-            If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
+            If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
             $Host.UI.WriteErrorLine($Msg)
         }
     }

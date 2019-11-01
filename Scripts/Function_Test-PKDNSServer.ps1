@@ -1,46 +1,55 @@
-﻿#requires -Version 3
+﻿#requires -version 3
 Function Test-PKDNSServer {
 <#
 .SYNOPSIS
-    Uses Resolve-DNSName to perform DNS lookups on one or more servers, with connectivity tests and option to return lookup output
+    Uses Resolve-DNSName to perform record lookups on one or more DNS servers, with optional connectivity tests and option to return lookup output
 
 .DESCRIPTION
-    Uses Resolve-DNSName to perform DNS lookups on one or more servers, with connectivity tests and option to return lookup output
+    Uses Resolve-DNSName to perform record lookups on one or more DNS servers, with optional connectivity tests and option to return lookup output
     Defaults to locally-configured DNS servers
     Defaults to microsoft.com as lookup target
-    By default attempts to ping DNS server and connect via TCP on port 53, but individual tests can be selected or skipped outright
+    By default, attempts to ping DNS server and connect via TCP on port 53, but individual tests can be selected or skipped outright
     Accepts pipeline input for DNS servers
     Returns a PSObject
+
+    Similar functions:
+    * Resolve-PKDNSName performs quick name resolution tests using Resolve-DNSName
+    * Resolve-PKDNSNameByNET uses the [System.Net.Dns]::GetHostEntryAsync() method for basic lookups on systems without the DNSClient module
 
 .NOTES
     Name    : Function_Test-PKDNSServer.ps1 
     Created : 2019-03-26
     Author  : Paula Kingsley
-    Version : 01.01.0000
+    Version : 02.00.0000
     History :
 
         ** PLEASE KEEP $VERSION UPDATED IN BEGIN BLOCK
         
         v01.00.0000 - 2019-03-26 - Created script
         v01.01.0000 - 2019-06-10 - Updated for standardization
+        v02.00.0000 - 2019-10-24 - Added option for multiple target lookup names/IPs, changed output properties, 
+                                   fixed record/name compatibility test, other updates
 
 .PARAMETER Server
-    DNS server name or IP (default is locally configured DNS servers)
+    One or more DNS server names or IPv4 addresses (default is locally configured nameservers)
 
-.PARAMETER Lookup
-    Name or IP address for record lookup (default is microsoft.com)
+.PARAMETER Name
+    One or more names or IPv4 addresses for DNS lookup test (default is microsoft.com)
 
 .PARAMETER RecordType
-    DNS record type: Any, A, AAAA, CNAME, MX, NS, PTR, SOA, SRV, TXT (default is 'A')
+    DNS record type: 'Any,' 'A,' 'AAAA,' 'CNAME,' 'MX,' 'NS,' 'PTR,' 'SOA,' 'SRV,' 'TXT' (default is 'A')
 
 .PARAMETER NoRecursion
     Don't perform recursive lookup
 
-.PARAMETER ReturnLookupData
-    Include lookup data in output object
+.PARAMETER ReturnLookupResults
+    Include lookup results in output object (default returns True/False only)
+
+.PARAMETER TruncateLookupOutput
+    Truncate lookup results (if returning)
 
 .PARAMETER ConnectionTests
-    Perform connection tests prior to lookup: Ping, TCP port 53, All, None (default is All)
+    Perform connection tests prior to lookup: 'Ping,' 'TCP53', 'All,' 'None' (default is 'All')
 
 .PARAMETER ConnectionTestTimeout
     Timeout for ping / TCP connection tests, between 1 millisecond and 30 seconds (default is 5 seconds; ignored if -ConnectionTests is 'None')
@@ -48,97 +57,132 @@ Function Test-PKDNSServer {
 .PARAMETER Quiet
     Suppress non-verbose console output
 
+
 .EXAMPLE
-    PS C:\> Test-PKDNSServer -Verbose
+    PS C:\> Test-PKDNSResolution -Verbose
 
         VERBOSE: PSBoundParameters: 
 	
-        Key                   Value           
-        ---                   -----           
-        Server                {172.30.41.8} 
-        Verbose               True            
-        Name                  microsoft.com   
-        RecordType            A               
-        NoRecursion           False           
-        ReturnLookupData      False           
-        TruncateLookupOutput  False           
-        ConnectionTests       All             
-        ConnectionTestTimeout 5000            
-        Quiet                 False           
-        ScriptName            Test-PKDNSServer
-        ScriptVersion         1.1.0           
-
-        VERBOSE: This function performs a DNS lookup for a single name against multiple DNS servers using the Resolve-DNS
-        Name cmdlet (part of the DNSClient module) with the option to test connectivity and return Boolean output for the
-         query.
-        The function Resolve-PKDNSName resolves multiple names against multiple DNS servers, with no connectivity tests.
-        The function Resolve-PKDNSNameByNET uses the [System.Net.Dns]::GetHostEntryAsync() method for basic lookups on sy
-        stems without the DNSClient module.
+        Key                   Value                                        
+        ---                   -----                                        
+        Verbose               True                                         
+        Server                {10.11.12.13, 10.11.12.17}
+        Name                  {microsoft.com}                              
+        RecordType            A                                            
+        NoRecursion           False                                        
+        ReturnLookupResults   False                                        
+        TruncateLookupOutput  False                                        
+        ConnectionTests       All                                          
+        ConnectionTestTimeout 5000                                         
+        Quiet                 False                                        
+        ScriptName            Test-PKDNSServer                             
+        ScriptVersion         2.0.0                                        
 
         BEGIN  : Test DNS server connectivity and record lookup
 
-        [172.30.41.8] Test ping to DNS server
-        [172.30.41.8] Ping succeeded in 10 milliseconds
-        [172.30.41.8] Test TCP connection on port 53 to DNS server
-        [172.30.41.8] TCP connection on port 53 succeeded in 10 milliseconds
-        [172.30.41.8] Perform DNS lookup (record type: A) for 'microsoft.com'
-        [172.30.41.8] Host address record lookup succeeded in 29 milliseconds
+        [10.11.12.13] Test ping to DNS server
+        [10.11.12.13] Ping succeeded in 4 milliseconds
+        [10.11.12.13] Test TCP connection on port 53 to DNS server
+        [10.11.12.13] TCP connection on port 53 succeeded in 2 milliseconds
+        [10.11.12.13] Perform DNS lookup (record type: A) for 'microsoft.com'
+        [10.11.12.13] Host address record lookup succeeded in 40 milliseconds
 
-        Server         : 172.30.41.8
-        Name           : microsoft.com
-        IsResolved     : True
-        RecordType     : A
-        Recursive      : True
-        TestPing       : True
-        TestConnection : True
-        ComputerName   : LAPTOP
-        SourceIP       : {172.30.55.79}
-        Messages       : Host address record lookup succeeded in 29 milliseconds
+        Server          : 10.11.12.13
+        Name            : microsoft.com
+        RecordType      : A
+        Recursive       : True
+        ConnectionTests : TCP53, Ping
+        PingSuccess     : True
+        TCP53Success    : True
+        LookupSuccess   : True
+        LookupResults   : -
+        ComputerName    : LAPTOP
+        SourceIP        : {192.168.32.6}
+        Messages        : Host address record lookup succeeded in 40 milliseconds
 
-        END    : Test DNS server connectivity and record lookup
-
-.EXAMPLE
-    PS C:\> Test-PKDNSServer -Server 1.1.1.1 -Name cloudflare.com -RecordType NS -NoRecursion -ReturnLookupData -ConnectionTests TCP -Quiet
-
-        Server         : 1.1.1.1
-        Name           : cloudflare.com
-        IsResolved     : True
-        RecordType     : NS
-        Recursive      : False
-        TestPing       : -
-        TestConnection : True
-        Output         : {@{QueryType=NS; Server=ns3.cloudflare.com; NameHost=ns3.cloudflare.com; Name=cloudflare.com; 
-                         Type=NS; CharacterSet=Unicode; Section=Answer; DataLength=46; TTL=21459}, @{QueryType=NS; 
-                         Server=ns4.cloudflare.com; NameHost=ns4.cloudflare.com; Name=cloudflare.com; Type=NS; 
-                         CharacterSet=Unicode; Section=Answer; DataLength=46; TTL=21459}, @{QueryType=NS; 
-                         Server=ns5.cloudflare.com; NameHost=ns5.cloudflare.com; Name=cloudflare.com; Type=NS; 
-                         CharacterSet=Unicode; Section=Answer; DataLength=46; TTL=21459}, @{QueryType=NS; 
-                         Server=ns6.cloudflare.com; NameHost=ns6.cloudflare.com; Name=cloudflare.com; Type=NS; 
-                         CharacterSet=Unicode; Section=Answer; DataLength=46; TTL=21459}...}
-        ComputerName   : LAPTOP
-        SourceIP       : {172.30.55.79}
-        Messages       : Nameserver record lookup succeeded in 86 milliseconds
+        [10.11.12.17] Test ping to DNS server
+        [10.11.12.17] Ping succeeded in 10 milliseconds
+        [10.11.12.17] Test TCP connection on port 53 to DNS server
+        [10.11.12.17] TCP connection on port 53 succeeded in 11 milliseconds
+        [10.11.12.17] Perform DNS lookup (record type: A) for 'microsoft.com'
+        [10.11.12.17] Host address record lookup succeeded in 17 milliseconds
+        
+        Server          : 10.11.12.17
+        Name            : microsoft.com
+        RecordType      : A
+        Recursive       : True
+        ConnectionTests : TCP53, Ping
+        PingSuccess     : True
+        TCP53Success    : True
+        LookupSuccess   : True
+        LookupResults   : -
+        ComputerName    : LAPTOP
+        SourceIP        : {192.168.32.6}
+        Messages        : Host address record lookup succeeded in 17 milliseconds
 
 .EXAMPLE
-    PS C :\> Test-PKDNSServer -Server 99.99.99.99 -Name cloudflare.com -RecordType NS -NoRecursion -ReturnLookupData -ConnectionTests TCP -Quiet
+    PS C:\> Test-PKDNSResolution -Name gmail.com -RecordType A -ReturnLookupResults -Quiet 
 
-        Server         : 99.99.99.99
-        Name           : cloudflare.com
-        IsResolved     : Error
-        RecordType     : NS
-        Recursive      : False
-        TestPing       : -
-        TestConnection : False
-        Output         : Error
-        ComputerName   : LAPTOP
-        SourceIP       : {172.30.55.79}
-        Messages       : TCP connection on port 53 failed after 2 milliseconds
+        Server          : 10.22.64.7
+        Name            : gmail.com
+        RecordType      : A
+        Recursive       : True
+        ConnectionTests : TCP53, Ping
+        PingSuccess     : True
+        TCP53Success    : True
+        LookupSuccess   : True
+        LookupResults   : {@{Address=216.58.195.69; IPAddress=216.58.195.69; QueryType=A; IP4Address=216.58.195.69; Name=gmail.com; 
+                          Type=A; CharacterSet=Unicode; Section=Answer; DataLength=4; TTL=300}, @{Address=216.58.195.69; 
+                          IPAddress=216.58.195.69; QueryType=A; IP4Address=216.58.195.69; Name=gmail.com; Type=A; CharacterSet=Unicode; 
+                          Section=Answer; DataLength=4; TTL=300}}
+        ComputerName    : WORKSTATION
+        SourceIP        : {192.168.5.79}
+        Messages        : Host address record lookup succeeded in 42 milliseconds
 
-    
+
+.EXAMPLE
+    PS C:\> Test-PKDNSResolution -Server 4.2.2.1 -Name nyt.com,8.8.8.8 -RecordType A -ConnectionTests None -NoRecursion -ReturnLookupResults -TruncateLookupOutput
+
+        BEGIN  : Test DNS server connectivity and record lookup, and return truncated lookup results
+
+        [4.2.2.1] Perform non-recursive DNS lookup (record type: A) for 'nyt.com'
+        [4.2.2.1] Host address record lookup succeeded in 40 milliseconds
+
+        Server          : 4.2.2.1
+        Name            : nyt.com
+        RecordType      : A
+        Recursive       : True
+        ConnectionTests : None
+        PingSuccess     : -
+        TCP53Success    : -
+        LookupSuccess   : True
+        LookupResults   : @{IP4Address=151.101.193.164; QueryType=A; Name=nyt.com; Type=A}
+        ComputerName    : PKTESTWKST
+        SourceIP        : {10.28.77.64}
+        Messages        : Host address record lookup succeeded in 40 milliseconds
+
+        WARNING: [4.2.2.1] Incompatible lookup target '8.8.8.8' for DNS record type 'A'
+        [4.2.2.1] Incompatible record type; operation cancelled by user
+
+        Server          : 4.2.2.1
+        Name            : 8.8.8.8
+        RecordType      : A
+        Recursive       : True
+        ConnectionTests : None
+        PingSuccess     : -
+        TCP53Success    : -
+        LookupSuccess   : Error
+        LookupResults   : Error
+        ComputerName    : PKTESTWKST
+        SourceIP        : {10.28.77.64}
+        Messages        : Incompatible record type; operation cancelled by user
+
+        END    : Test DNS server connectivity and record lookup, and return truncated lookup results
+ 
 #>
 [cmdletbinding(
     SupportsShouldProcess,
-    ConfirmImpact = "Medium"
+    ConfirmImpact = "High"
 )]
 Param(
     
@@ -146,7 +190,7 @@ Param(
         Position = 0,
         ValueFromPipeline = $True,
         ValueFromPipelineByPropertyName = $True,
-        HelpMessage = "DNS server name or IP (default is locally configured)"
+        HelpMessage = "One or more DNS server names or IPv4 addresses (default is locally configured nameservers)"
     )]
     [ValidateNotNullOrEmpty()]
     [Alias("Nameserver","DNSServer","IPAddress","IPv4Address","HostName")]
@@ -154,14 +198,14 @@ Param(
 
     [Parameter(
         Position = 1,
-        HelpMessage = "Name or IP for DNS lookup test (default is microsoft.com)"
+        HelpMessage = "One or more names or IPv4 addresses for DNS lookup test (default is microsoft.com)"
     )]
     [ValidateNotNullOrEmpty()]
     [Alias("Target","Lookup")]
-    [string]$Name = "microsoft.com",
+    [string[]]$Name = "microsoft.com",
 
     [Parameter(
-        HelpMessage = "DNS record type: Any, A, AAAA, CNAME, MX, NS, PTR, SOA, SRV, TXT (default is 'A')"
+        HelpMessage = "DNS record type: 'Any,' 'A,' 'AAAA,' 'CNAME,' 'MX,' 'NS,' 'PTR,' 'SOA,' 'SRV,' 'TXT' (default is 'A')"
     )]
     [ValidateSet('Any','A','AAAA','CNAME','MX','NS','PTR','SOA','SRV','TXT')]
     [string]$RecordType = "A",
@@ -173,30 +217,31 @@ Param(
 
     [Parameter(
         ParameterSetName = "Lookup",
-        HelpMessage = "Include lookup data in output object (default is True/False only)"
+        HelpMessage = "Include lookup results in output object (default returns True/False only)"
     )]
-    [Switch]$ReturnLookupData,
+    [Alias("ReturnLookupData")]
+    [Switch]$ReturnLookupResults,
 
     [Parameter(
         ParameterSetName = "Lookup",
-        HelpMessage = "Truncate lookup data if returning"
+        HelpMessage = "Truncate lookup results (if returning)"
     )]
     [switch]$TruncateLookupOutput,
 
     [Parameter(
-        HelpMessage = "Perform connection tests prior to lookup: Ping, TCP port 53, All, None (default is All)"
+        HelpMessage = "Perform connection tests prior to lookup: 'Ping,' 'TCP53', 'All,' 'None' (default is 'All')"
     )]
-    [ValidateSet("All","Ping","TCP","None")]
+    [ValidateSet("All","Ping","TCP53","None")]
     [String]$ConnectionTests = "All",
 
     [Parameter(
-        HelpMessage = "Timeout for Ping / TCP connection tests, between 1 millisecond and 30 seconds (default is 5 seconds; ignored if -ConnectionTests is 'None')"
+        HelpMessage = "Timeout for ping / TCP connection tests, between 1 millisecond and 30 seconds (default is 5 seconds; ignored if -ConnectionTests is 'None')"
     )]
     [ValidateRange(1,30000)]
     [int]$ConnectionTestTimeout = 5000,
 
     [Parameter(
-        HelpMessage = "Suppress non-verbose/non-error console output"
+        HelpMessage = "Suppress non-verbose console output"
     )]
     [Alias("SuppressConsoleOutput")]
     [Switch]$Quiet
@@ -205,7 +250,7 @@ Param(
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.01.0000"
+    [version]$Version = "02.00.0000"
     
     $CurrentParams = $PSBoundParameters
     $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
@@ -234,10 +279,6 @@ Begin {
         Break
     }
 
-    # Function options
-    $Msg = "This function performs a DNS lookup for a single name against multiple DNS servers using the Resolve-DNSName cmdlet (part of the DNSClient module) with the option to test connectivity and return Boolean output for the query.`nThe function Resolve-PKDNSName resolves multiple names against multiple DNS servers, with no connectivity tests.`nThe function Resolve-PKDNSNameByNET uses the [System.Net.Dns]::GetHostEntryAsync() method for basic lookups on systems without the DNSClient module.`n"
-    Write-Verbose $Msg
-
     #region Functions
 
     # Function to write a console message or a verbose message
@@ -251,13 +292,11 @@ Begin {
         Else {Write-Verbose "$Message"}
     }
 
-    # Function to write an error or a verbose message
+    # Function to write an error as a string (no stacktrace)
     Function Write-MessageError {
         [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message)#,[switch]$Quiet = $Quiet)
-        $BGColor = $host.UI.RawUI.BackgroundColor
-        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("$Message")}
-        Else {Write-Verbose "$Message"}
+        Param([Parameter(ValueFromPipeline)]$Message)
+        $Host.UI.WriteErrorLine("$Message")
     }
 
     # Function to check for incompatible lookup/type
@@ -266,9 +305,11 @@ Begin {
         Param($RecordType,$Name)
             $ErrorActionPreference = "Stop"
             Try {
+                $Msg = "Record type: $RecordType ... Name: $Name"
+                Write-Verbose $Msg
                 Switch ($RecordType) {
                     PTR {
-                        If ($Name -as [ipaddress]) {$True}
+                        If ([bool]($Name -as [ipaddress])) {$True}
                         Else {$False}
                     }
                     AAAA {
@@ -301,13 +342,13 @@ Begin {
                     }
                     Any     {$True}
                     Default {
-                        If ($Name -as [ipaddress]) {$False}
+                        If ([bool]($Name -as [ipaddress])) {$False}
                         Else {$True}
                     }
                 }
             }
             Catch {
-                break
+                $False
             }
     } #end Test-CompatibleType
 
@@ -360,89 +401,92 @@ Begin {
             ErrorVariable = "Fail"
         }
         If ($PSBoundParameters.RecordType) {$Splat.Add("Type",$RecordType)}
+        
+        $Results = [pscustomobject]@{
+            IsResolved = "Error"
+            Output     = "Error"
+        }
+
         Try {
             # If we got results
-            If ($Results = (Resolve-DNSName @Splat| Select *)) {
-                Write-Verbose ($Results | Out-String)
+            If ($Resolve = (Resolve-DNSName @Splat| Select *)) {
+                
+                Write-Verbose ($Resolve | Out-String)    
 
                 # Return fewer properties if truncating (will still get only first row later)
-                If ($Truncate.IsPresent) {$Results = ($Results | Select IP4Address,QueryType,Name,Type)}
+                If ($Truncate.IsPresent) {$Resolve = ($Resolve | Select IP4Address,QueryType,Name,Type)}
                 
                 # If we want to make sure we are getting the results back only for that record type
                 If ($Strict.IsPresent -and $PSBoundParameters.RecordType) {
-                    $Results = $Results | Where-Object {$_.Type -eq $RecordType}
-                    If ($Results) {
-                        If ($Boolean.IsPresent) {$True}
-                        Else {Write-Output $Results}
+                    $Resolve = $Resolve | Where-Object {$_.Type -eq $RecordType}
+                    If ($Resolve) {
+                        $Results.IsResolved = $True
+                        $Results.Output = $Resolve
+                        Write-Output $Results
                     }
                     Else {
-                        If ($Boolean.IsPresent) {$False}
-                        Else {Write-Output "Failed to resolve '$Target' with record type '$RecordType'"}
+                        $Msg = "Failed to resolve '$Target' with record type '$RecordType'"
+                        $Results.IsResolved = $False
+                        $Results.Output = $Msg
                     }
                 }
                 Else {
-                    If ($Boolean.IsPresent) {$True}
-                    Else {Write-Output $Results}
+                    $Results.IsResolved = $True
+                    $Results.Output = $Resolve                    
                 }
             }
             # If we got nothing...
             Else {
-                If ($Boolean.IsPresent) {$False}
+                
+                If ($Fail) {
+                    $Msg = "FAIL: $($Fail.Exception.Message)"
+                }  
                 Else {
-                    If ($Fail) {Write-Output "FAIL: $($Fail.Exception.Message)"}   
-                    Else {Write-Output "FAIL: Lookup failed"}
+                    $Msg = "FAIL: Lookup failed"
                 }
+                $Results.IsResolved = $False
+                $Results.Output = $Msg
             }
         }
         Catch {
             $Msg = $_.Exception.Message
-            If ($Boolean.IsPresent) {$False}
-            Else {Write-Output $Msg}
+            $Results.IsResolved = $False
+            $Results.Output = $Msg
         }
+
+        If ($Boolean.IsPresent) {Write-Output $Results.IsResolved}
+        Else {Write-Output $Results}
+
     } #end Test-Lookup
 
     #endregion Functions
     
-    #region Test compatibility of lookup name & record type
-
-    If ($CurrentParams.RecordType -ne "Any") {
-        Try {
-            If (-not (Test-CompatibleType -RecordType $RecordType -Lookup $Name -ErrorAction Stop)) {
-                $Msg = "Incompatible lookup target '$Name' for DNS record type '$RecordType'"
-                $Host.UI.WriteErrorLine("$Msg")
-                Break
-            }
-        }
-        Catch {}
-    }
-
-    #endregion Test compatibility of lookup name & record type
-
     #region Output object
 
     [switch]$IsRecursive = (-not $NoRecursion)
     $InitialValue = "Error"
     $OutputTemplate = [PSCustomObject]@{
-        Server         = $Server
-        Name           = $Name
-        IsResolved     = $InitialValue
-        RecordType     = $RecordType
-        Recursive      = $IsRecursive.IsPresent
-        TestPing       = $InitialValue
-        TestConnection = $InitialValue
-        #TestLookup     = $InitialValue
-        Output         = $InitialValue
-        ComputerName   = $Env:ComputerName
-        SourceIP       = @(@(Get-CIMInstance -Class Win32_NetworkAdapterConfiguration -Verbose:$False -ErrorAction SilentlyContinue | Select-Object -ExpandProperty IPAddress) -like "*.*") #-join(", ")
-        Messages       = $InitialValue
+        Server          = $Server
+        Name            = $Name
+        RecordType      = $RecordType
+        Recursive       = $IsRecursive.IsPresent
+        ConnectionTests = $InitialValue
+        PingSuccess     = $InitialValue
+        TCP53Success    = $InitialValue
+        LookupSuccess   = $InitialValue
+        LookupResults   = $InitialValue
+        ComputerName    = $Env:ComputerName
+        SourceIP        = @(@(Get-CIMInstance -Class Win32_NetworkAdapterConfiguration -Verbose:$False -ErrorAction SilentlyContinue | Select-Object -ExpandProperty IPAddress) -like "*.*") #-join(", ")
+        Messages        = $InitialValue
     }
-    If (-not $ReturnLookupData.IsPresent) {
-        $OutputTemplate.PSObject.Properties.Remove("Output")
+    If (-not $ReturnLookupResults.IsPresent) {
+        $OutputTemplate.LookupResults = "-"
     }
     Switch ($ConnectionTests) {
-        "None" {$OutputTemplate.TestPing = $OutputTemplate.TestConnection = "-"}
-        "Ping" {$OutputTemplate.TestConnection = "-"}
-        "TCP"  {$OutputTemplate.TestPing = "-"}
+        "None"   {$OutputTemplate.PingSuccess = $OutputTemplate.TCP53Success = "-"}
+        "Ping"   {$OutputTemplate.TCP53Success = "-"}
+        "TCP53"  {$OutputTemplate.PingSuccess = "-"}
+        "All"    {$OutputTemplate.ConnectionTests = "TCP53, Ping"}
     }
 
     # For the results/output
@@ -519,13 +563,13 @@ Begin {
 
     # Splat for Write-Progress
     If ($ConnectionTests -ne "None") {
-        $Activity = "Test DNS server connectivity and record lookup"
+        $Activity = "Test server connectivity and perform DNS record lookup"
     }
     Else {
-        $Activity = "Test DNS server lookup"
+        $Activity = "Perform DNS record lookup"
     }
     
-    If ($ReturnLookupData.IsPresent) {
+    If ($ReturnLookupResults.IsPresent) {
         If ($TruncateLookupOutput.IsPresent) {
             $Activity += ", and return truncated lookup results"
         }
@@ -559,31 +603,14 @@ Process {
         $Param_WP.PercentComplete = ($Current/$Total*100)
         
         $Messages = @()
-        [switch]$Continue = $False
+        [switch]$Continue = $True
 
-        $Output = $OutputTemplate.PSObject.Copy()
-        $Output.Server = $S
+        $Output1 = $OutputTemplate.PSObject.Copy()
+        $Output1.Server = $S
 
-        # Just in case someone hasn't been careful with their parameters (ask me how I know)
-        If ($Server -eq $Name) {
-            $Msg = "DNS server and lookup target are identical"
-            "[$S] $Msg" | Write-MessageInfo -FGColor Red
-            $ConfirmMsg = "`n$Msg`nDo you wish to proceed with DNS query?`n"
-            If ($PSCmdlet.ShouldContinue($ConfirmMsg,$Server)) {
-                $Continue = $True
-            }
-            Else {
-                $Msg = "Operation cancelled by user"
-                "[$S] $Msg"  | Write-MessageInfo -FGColor Cyan
-            }
-        }
-        Else {
-            $Continue = $True
-        }
-
-        # Test ping
+        # Unless skipping test, ping server; quit on failure
         If ($Continue.IsPresent) {
-
+            
             If ($TestPing.IsPresent) {
             
                 #Reset flag
@@ -604,7 +631,9 @@ Process {
                         $Msg = "Ping succeeded in $Elapsed milliseconds"
                         "[$S] $Msg"  | Write-MessageInfo -FGColor Green
 
-                        $Output.TestPing = $True
+                        $Output1.PingSuccess = $True
+
+                        # Reset flag
                         $Continue = $True
                     }
                     Else {
@@ -612,8 +641,8 @@ Process {
                         $Elapsed = ($EndTime - $StartTime).MilliSeconds
                         $Msg = "Ping failed after $Elapsed milliseconds"
                         "[$S] $Msg" | Write-MessageError
-
-                        $Output.TestPing = $False
+                        $Output1.PingSuccess = $False
+                        Write-Output $Output1
                     }
                 }
                 Catch {
@@ -622,15 +651,12 @@ Process {
                     $Msg = "Ping failed after $Elapsed milliseconds"
                     If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
                     "[$S] $Msg" | Write-MessageError
+                    Write-Output $Output1
                 }
-            }
-            Else {
-                $Msg = "Ping test skipped"
-                "[$S] $Msg"  | Write-MessageInfo -FGColor Cyan
             }
         }
         
-        # Test TCP connection
+        # Unless skipping test, connect to server on TCP port 53; quit on failure
         If ($Continue.IsPresent) {
 
             If ($TestTCPConnection.IsPresent) {
@@ -652,7 +678,9 @@ Process {
                         $Elapsed = ($EndTime - $StartTime).MilliSeconds
                         $Msg = "TCP connection on port 53 succeeded in $Elapsed milliseconds"
                         "[$S] $Msg"  | Write-MessageInfo -FGColor Green
-                        $Output.TestConnection = $True
+                        $Output1.TCP53Success = $True
+
+                        # Reset flag
                         $Continue = $True
                     }
                     Else {
@@ -660,7 +688,8 @@ Process {
                         $Elapsed = ($EndTime - $StartTime).MilliSeconds
                         $Msg = "TCP connection on port 53 failed after $Elapsed milliseconds"
                         "[$S] $Msg" | Write-MessageError
-                        $Output.TestConnection = $False
+                        $Output1.TCP53Success = $False
+                        Write-Output $Output1
                     }
                 }
                 Catch {
@@ -671,105 +700,153 @@ Process {
                         $Msg += " ($ErrorDetails)"
                     }
                     "[$S] $Msg" | Write-MessageError
-                    $Output.TestConnection = $False
+                    $Output1.TCP53Success = $False
+                    Write-Output $Output1
                 }
-            }
-            Else {
-                $Msg = "Connection test skipped"
-                "[$S] $Msg"  | Write-MessageInfo -FGColor Cyan
             }
         }
         
-
-        # Look up A record
+        # Look up record(s)
         If ($Continue.IsPresent) {
             
-            If ($NoRecursion.IsPresent) {
-                $Msg = "Perform non-recursive DNS lookup (record type: $RecordType) for '$Name'"
-            }
-            Else {
-                $Msg = "Perform DNS lookup (record type: $RecordType) for '$Name'"
-            }
-            "[$S] $Msg"  | Write-MessageInfo -FGColor White
-
-            $Param_WP.CurrentOperation = $Msg
-            Write-Progress @Param_WP
-
             $Param_Lookup.DNSServer = $S
-            Try {
-                $StartTime = Get-Date
-                $Test = Test-Lookup @Param_Lookup
-                $EndTime = Get-Date
-                $Elapsed = ($EndTime - $StartTime).MilliSeconds
                 
-                If ($Test -eq $False) {
-                    $Msg = "$($RecordLookup[$RecordType]) lookup failed after $Elapsed milliseconds"
-                    "[$S] $Msg" | Write-MessageError
-                    $Output.IsResolved = $False
-                    $Output.Messages = $Msg
-                }
-                Elseif ($Test -match "FAIL: ") {
-                    $Msg = "$($RecordLookup[$RecordType]) lookup failed after $Elapsed milliseconds"
-                    "[$S] $Msg" | Write-MessageError
-                    $Output.IsResolved = $False
-                    If ($ReturnLookupData.IsPresent) {
-                        $Output.Output = $Test.Replace("FAIL: ",$Null)
+            Foreach ($N in $Name) {
+                
+                $N = $N.Trim()
+                $Output2 = $Output1.PSObject.Copy()
+                $Output2.Name = $N
+
+                # Check to see if we're asking it to resolve itself
+                If ($S -eq $N) {
+                    
+                    # Reset flag
+                    $Continue = $False
+
+                    $Msg = "DNS server and lookup target are identical"
+                    Write-Warning "[$S] $Msg"
+                    
+                    $ConfirmMsg = "`n`n`t$Msg!`n`tDo you wish to proceed with DNS query?`n`n"
+                    If ($PSCmdlet.ShouldProcess($Server,$ConfirmMsg)) {
+                        
+                        # Reset flag
+                        $Continue = $True
                     }
-                    $Output.Messages = $Msg
-                }
-                Else  {
-                    $Msg = "$($RecordLookup[$RecordType]) lookup succeeded in $Elapsed milliseconds"
-                    "[$S] $Msg"  | Write-MessageInfo -FGColor Green
-
-                    $Output.IsResolved = $True
-                    If ($ReturnLookupData.IsPresent) {
-                        If ($TruncateLookupOutput.IsPresent) {
-                            $Output.Output = ($Test | Select-Object -First 1) 
-                        }
-                        Else {
-                            $Output.Output = $Test
-                        }
-                        }
-                    $Output.Messages = $Msg   
-                }
-
-                <#
-
-                If ($Test -in ($False,"Lookup failed")) {
-                    $Msg = "$($RecordLookup[$RecordType]) lookup failed after $Elapsed milliseconds"
-                    "[$S] $Msg" | Write-MessageError
-                    $Output.TestLookup = $False
-                }
-                Else {
-                    $Msg = "$($RecordLookup[$RecordType]) lookup succeeded in $Elapsed milliseconds"
-                    $Output.TestLookup = $True
-                    "[$S] $Msg"  | Write-MessageInfo -FGColor Green
-
-                    If ($ReturnLookupData.IsPresent) {
-                        If ($TruncateLookupOutput.IsPresent) {
-                            $Output.Output = ($Test | Select-Object -First 1) # -join("`n"))# | Out-String)
-                        }
-                        Else {
-                            $Output.Output = $Test # | Out-String
-                        }
+                    Else {
+                        $Msg = "Operation cancelled by user"
+                        "[$S] $Msg"  | Write-MessageInfo -FGColor Cyan
+                        $Output2.Messages = $Msg
+                        Write-Output $Output2
                     }
                 }
 
-                #>
-            }
-            Catch {
-                $EndTime = Get-Date
-                $Elapsed = ($EndTime - $StartTime).MilliSeconds
-                $Msg = "$($RecordLookup[$RecordType]) lookup failed after $Elapsed milliseconds"
-                If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
-                "[$S] $Msg" | Write-MessageError
-            }
+                If ($Continue.IsPresent) {
+                    
+                    If ($CurrentParams.RecordType -ne "Any") {
+
+                        Try {
+                            If (-not (Test-CompatibleType -RecordType $RecordType -Name $N -ErrorAction Stop)) {
+
+                                # Reset flag
+                                $Continue = $False
+
+                                $Msg = "Incompatible lookup target '$N' for DNS record type '$RecordType'"
+                                Write-Warning "[$S] $Msg"
+
+                                $ConfirmMsg = "`n`n`t$Msg`n`tDo you wish to proceed with DNS query?`n`n"
+                                If ($PSCmdlet.ShouldProcess($Server,$ConfirmMsg)) {
+                                
+                                    # Reset flag
+                                    $Continue = $True
+                                }
+                                Else {
+                                    $Msg = "Operation cancelled by user"
+                                    "[$S] $Msg"  | Write-MessageInfo -FGColor Cyan
+                                    $Output2.Messages = "Incompatible record type; operation cancelled by user"
+                                    Write-Output $Output2
+                                }
+                            }
+                        }
+                        Catch {
+                            $Msg = "Error testing compatible record type"
+                            "[$S] $Msg"  | Write-MessageError
+                            $Output2.Messages = $Msg
+                            Write-Output $Output2
+                        }
+                    }
+                }
+
+                If ($Continue.IsPresent) {
+                
+                    If ($NoRecursion.IsPresent) {
+                        $Msg = "Perform non-recursive DNS lookup (record type: $RecordType) for '$N'"
+                    }
+                    Else {
+                        $Msg = "Perform DNS lookup (record type: $RecordType) for '$N'"
+                    }
+                    "[$S] $Msg"  | Write-MessageInfo -FGColor White
+
+                    $Param_WP.CurrentOperation = $Msg
+                    Write-Progress @Param_WP
+
+                    $Param_Lookup.Target = $N
+
+                    Try {
+                        $StartTime = Get-Date
+                        $Test = Test-Lookup @Param_Lookup
+                        $EndTime = Get-Date
+                        $Elapsed = ($EndTime - $StartTime).MilliSeconds
+                
+                        If ($Test.IsResolved -eq $False) {
+                            $Msg = "$($RecordLookup[$RecordType]) lookup failed after $Elapsed milliseconds"
+                            "[$S] $Msg" | Write-MessageError
+                            $Output2.LookupSuccess = $False
+                            If ($ReturnLookupResults.IsPresent) {
+                                $Output2.LookupResults = $Test.Output
+                            }
+                            $Output2.Messages = $Msg
+                        }
+                        Elseif ($Test.Output -match "FAIL: ") {
+                            $Msg = "$($RecordLookup[$RecordType]) lookup failed after $Elapsed milliseconds"
+                            "[$S] $Msg" | Write-MessageError
+                            $Output.LookupSuccess = $False
+                            If ($ReturnLookupResults.IsPresent) {
+                                $Output2.LookupResults = $Test.Replace("FAIL: ",$Null)
+                            }
+                            $Output2.Messages = $Msg
+                        }
+                        Else  {
+                            $Msg = "$($RecordLookup[$RecordType]) lookup succeeded in $Elapsed milliseconds"
+                            "[$S] $Msg"  | Write-MessageInfo -FGColor Green
+
+                            $Output2.LookupSuccess = $True
+                            If ($ReturnLookupResults.IsPresent) {
+                                If ($TruncateLookupOutput.IsPresent) {
+                                    $Output2.LookupResults = ($Test.Output | Select-Object -First 1) 
+                                }
+                                Else {
+                                    $Output2.LookupResults = $Test.Output
+                                }
+                            }
+                            $Output2.Messages = $Msg   
+                        }
+                    }
+                    Catch {
+                        $EndTime = Get-Date
+                        $Elapsed = ($EndTime - $StartTime).MilliSeconds
+                        $Msg = "$($RecordLookup[$RecordType]) lookup failed after $Elapsed milliseconds"
+                        If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
+                        "[$S] $Msg" | Write-MessageError
+                        $Output2.Messages = $Msg
+                    }
+
+                    Write-Output $Output2
+                }
+                
+            } #end foreach name
+
         } # end if proceeding to lookup
-        
-        $Output.Messages = $Msg
-        Write-Output $Output
     }
-
 }
 End {
     

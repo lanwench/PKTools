@@ -11,13 +11,14 @@ Function Restore-PKISESession {
     Name    : Function_Restore-PKISESession.ps1
     Created : 2016-05-29
     Author  : Paula Kingsley
-    Version : 02.00.0000
+    Version : 02.01.0000
     History :
     
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
         v01.00.0000 - 2016-05-29 - Created script based on links
         v02.00.0000 - 2018-02-14 - Updated/made consistent with new Save-PKISESession
+        v02.01.0000 - 2019-10-08 - Minor cosmetic updates
         
 .LINK
     https://itfordummies.net/2014/10/27/save-restore-powershell-ise-opened-scripts/
@@ -35,7 +36,6 @@ Function Restore-PKISESession {
 )]
 Param(
     [Parameter(
-        Mandatory = $False,
         Position=0,
         ValueFromPipeline = $True,
         HelpMessage = "Full path to text file (created using Save-PKISESession)"
@@ -47,7 +47,7 @@ Param(
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "02.00.0000"
+    [version]$Version = "02.01.0000"
 
     # Show our settings
     $CurrentParams = $PSBoundParameters
@@ -121,7 +121,7 @@ Process{
                     }
                     Catch {
                         $Msg = "Operation failed"
-                        If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
+                        If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
                         $Host.UI.WriteErrorLine($Msg)
                     }
                 }
@@ -141,7 +141,7 @@ Process{
     }
     Catch {
         $Msg = "Operation failed"
-        If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
+        If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
         $Host.UI.WriteErrorLine($Msg)
 
     }
