@@ -257,7 +257,6 @@ Process {
             "[$FileName] $Msg" | Write-MessageInfo -FGColor Green
 
             Try {
-                
                 $Msg = "Get logfile content"
                 "[$FileName] $Msg" | Write-MessageInfo -FGColor White
 
@@ -286,15 +285,14 @@ Process {
                             Write-Progress @Param_WP -PercentComplete ($Current/$Total*100)
 
                             $_ -replace '#Fields: ', ''
-                            } | 
+
+                        } | Where-Object {$_ -notmatch '^#'} | ConvertFrom-CSV -Delimiter ' '
                             
-                            Where-Object {$_ -notmatch '^#'} | ConvertFrom-CSV -Delimiter ' '
+                        $Msg = "Successfully converted $Total logfile entries to a PSObject"
+                        "[$FileName] $Msg" | Write-MessageInfo -FGColor Green
+                        Write-Progress -Activity $Activity -Completed
                             
-                            $Msg = "Successfully converted $Total logfile entries to a PSObject"
-                            "[$FileName] $Msg" | Write-MessageInfo -FGColor Green
-                            Write-Progress -Activity $Activity -Completed
-                            
-                            Write-Output $Output
+                        Write-Output $Output
                 
                     }
                     Catch {

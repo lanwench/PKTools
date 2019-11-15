@@ -16,13 +16,14 @@ Function Get-PKTaniumActionLog {
     Name    : Get-PKTaniumActionLog.ps1
     Created : 2019-06-19
     Author  : Paula Kingsley
-    Version : 02.00.0000
+    Version : 02.01.0000
     History :
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
         
         v01.00.0000 - 2019-06-19 - Created script
         v02.00.0000 - 2019-08-13 - Added parameters for dates, action type, handling for multiple action files, local computer
+        v02.01.0000 - 2019-11-14 - Fixed issue where -AllDates still asked for an end date
 
 .PARAMETER ComputerName
     One or more computer names (default is local computer)
@@ -34,7 +35,7 @@ Function Get-PKTaniumActionLog {
     Include all discovered action-history log files (default is the most recently written to)
 
 .PARAMETER AllDates
-    Return entries from all dates (ignores start date)
+    Return entries from all dates (ignores start/end dates)
 
 .PARAMETER ActionTypeFilter
     Return only actions where the filter string matches an action type (default is no filter)
@@ -298,7 +299,7 @@ Param (
     [Switch] $AllFiles,
 
     [Parameter(
-        HelpMessage = "Return entries from all dates (ignores start date)"
+        HelpMessage = "Return entries from all dates (ignores start/end dates)"
     )]
     [switch]$AllDates,
 
@@ -366,13 +367,16 @@ Param (
 Begin { 
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "02.00.0000"
+    [version]$Version = "02.01.0000"
 
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     
     $CurrentParams = $PSBoundParameters
+    If ($AllDates.IsPresent) {
+        $CurrentParams.StartDate = $Null
+    }
     $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
         Where {Test-Path variable:$_}| Foreach {
             $CurrentParams.Add($_, (Get-Variable $_).value)
@@ -402,7 +406,7 @@ Begin {
     If ($AllDates.IsPresent -and $StartDate) {
         $Msg = "You have selected -AllDates; StartDate and EndDate values will be ignored"
         Write-Warning $Msg
-        $StartDate = $EndDate = ""
+        $StartDate = ""
     }
     Else {
         If ($StartDate -and $EndDate) {
