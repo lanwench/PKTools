@@ -16,7 +16,7 @@ Function Get-PKTaniumActionLog {
     Name    : Get-PKTaniumActionLog.ps1
     Created : 2019-06-19
     Author  : Paula Kingsley
-    Version : 02.01.0000
+    Version : 02.02.0000
     History :
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
@@ -24,6 +24,7 @@ Function Get-PKTaniumActionLog {
         v01.00.0000 - 2019-06-19 - Created script
         v02.00.0000 - 2019-08-13 - Added parameters for dates, action type, handling for multiple action files, local computer
         v02.01.0000 - 2019-11-14 - Fixed issue where -AllDates still asked for an end date
+        v02.02.0000 - 2020-01-23 - Fixed filename filter based on changes to path/extension
 
 .PARAMETER ComputerName
     One or more computer names (default is local computer)
@@ -304,10 +305,11 @@ Param (
     [switch]$AllDates,
 
     [Parameter(
-        HelpMessage = "Start date (default is past 24 hours; ignored if -AllDates is present)"
+        HelpMessage = "Start date (default is past 30 days; ignored if -AllDates is present)"
     )]
     #[ValidateNotNullOrEmpty()]
-    $StartDate = ([System.DateTime]::Now).AddHours(-24),
+    #$StartDate = ([System.DateTime]::Now).AddHours(-24),
+    $StartDate = ([System.DateTime]::Now).AddDays(-30),
 
     [Parameter(
         HelpMessage = "End date (default is now)"
@@ -367,7 +369,7 @@ Param (
 Begin { 
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "02.01.0000"
+    [version]$Version = "02.02.0000"
 
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
@@ -445,11 +447,12 @@ Begin {
     $ScriptBlock = {
         
         Param($ArgList)
+
         If ($ArgList.CustomFilePath) {
             If (Test-Path $ArgList.CustomFilePath -PathType Container -EA SilentlyContinue) {
                 $Path = $ArgList.CustomFilePath
                 Try {
-                    $ActionFile = Get-ChildItem $CustomFilePath -Recurse -Filter action-history*.txt -EA SilentlyContinue | Get-Item
+                    $ActionFile = Get-ChildItem $CustomFilePath -Recurse -Filter action-history*.txt -EA SilentlyContinue -Force | Get-Item -Force
                 }
                 Catch {
                     $Msg = "No Tanium client activity logfile found in path '$Path'"
@@ -460,17 +463,14 @@ Begin {
             }
         }
         Else {
-            
             $TaniumCommandPath = "$($Env:SystemDrive)\Program Files*\Tanium\Tanium Client\taniumclient.exe"
             $Path = ($TaniumCommandPath | Select-Object $_.Path | Split-Path -Parent)
 
             Try {
-                If ($Parent = Get-Command -Name $TaniumCommandPath | Select-Object $_.Path | Split-Path -Parent) {
-                    $ActionFile = Get-ChildItem $Parent -Recurse -Filter action-history*.txt -EA SilentlyContinue | Get-Item
-                }
-                Else {
-                    $Msg = "No Tanium Client action log file found in path '$Path'"
-                }
+                $Parent = Get-Command -Name $TaniumCommandPath -EA Stop | Select-Object $_.Path | Split-Path -Parent -EA Stop
+                #$ActionFile = Get-ChildItem $Parent -Recurse -Filter action-history*.txt -Force -EA Stop | Get-Item -Force -EA Stop
+                $FileRegex = "\.log|\.txt"
+                $ActionFile = Get-ChildItem $Parent -Recurse -Filter "action*" -Force -EA Stop | Where-Object -FilterScript {$_.Name -match $FileRegex}
             }
             Catch {
                 $Msg = "Something horrible has happened!"
@@ -494,7 +494,7 @@ Begin {
                     If ($M = $rx.Matches($LogContent)) {
                         $Output = @()
                         $Output += Foreach ($item in $m) {
-                            [pscustomobject]@{
+                            New-Object PSObject -Property @{
                                 Computername = $env:Computername
                                 Date         = $item.groups[1].Value -as [datetime]
                                 ActionID     = $item.groups[2].value
@@ -521,7 +521,7 @@ Begin {
         }
             
         If (-not $Output) {
-            $Output = [pscustomobject]@{
+            $Output = New-Object PSObject -Property @{
                 Computername = $Env:Computername
                 Date         = "-"
                 ActionID     = "-"
@@ -535,7 +535,7 @@ Begin {
             If ($ArgList.ActionTypeFilter) {
                 If (-not ($Output = $Output | Where-Object {$_.Action -match "^$($ArgList.ActionTypeFilter)"})) {
                     $Msg = "No results found with action filter matching '^$($ArgList.ActionTypeFilter)')"
-                    $Output = [pscustomobject]@{
+                    $Output = New-Object PSObject -Property @{
                         Computername = $Env:Computername
                         Date         = "-"
                         ActionID     = "-"
@@ -547,7 +547,7 @@ Begin {
             If ($ArgList.Start -and $ArgList.End) {
                 If (-not ($Output = $Output | Where-Object {($_.Date -gt $ArgList.Start) -and ($_.Date -lt $ArgList.End)})) {
                     $Msg = "No results found between $($ArgList.Start.ToString()) and $($ArgList.End.ToString())"
-                    $Output = [pscustomobject]@{
+                    $Output = New-Object PSObject -Property @{
                         Computername = $Env:Computername
                         Date         = "-"
                         ActionID     = "-"
