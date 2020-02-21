@@ -265,7 +265,7 @@ Function Get-PKTaniumActionLog {
 #> 
 
 [CmdletBinding(
-    DefaultParameterSetName = "Interactive",
+    DefaultParameterSetName = "All",
     SupportsShouldProcess = $True,
     ConfirmImpact = "High"
 )]
@@ -288,6 +288,13 @@ Param (
     [string] $CustomFilePath,
 
     [Parameter(
+        HelpMessage = "Type of log to return (default is ActionHistory)"
+    )]
+    [ValidateNotNullOrEmpty()]
+    [ValidateSet("ActionLogs","ActionHistory")]
+    [string] $LogType = "ActionHistory",
+
+    [Parameter(
         HelpMessage = "Return only actions where the filter string matches an action type (default is no filter)"
     )]
     [ValidateNotNullOrEmpty()]
@@ -295,16 +302,19 @@ Param (
     [string] $ActionTypeFilter,
     
     [Parameter(
+        
         HelpMessage = "Include all discovered action-history log files (default is the most recently written)"
     )]
     [Switch] $AllFiles,
 
     [Parameter(
+        ParameterSetName = "All",
         HelpMessage = "Return entries from all dates (ignores start/end dates)"
     )]
     [switch]$AllDates,
 
     [Parameter(
+        ParameterSetName = "Dates",
         HelpMessage = "Start date (default is past 30 days; ignored if -AllDates is present)"
     )]
     #[ValidateNotNullOrEmpty()]
@@ -312,6 +322,7 @@ Param (
     $StartDate = ([System.DateTime]::Now).AddDays(-30),
 
     [Parameter(
+        ParameterSetName = "Dates",
         HelpMessage = "End date (default is now)"
     )]
     [ValidateNotNullOrEmpty()]
@@ -379,6 +390,11 @@ Begin {
     If ($AllDates.IsPresent) {
         $CurrentParams.StartDate = $Null
     }
+    If ($Source -eq "All") {
+        $AllDates = $True
+        $CurrentParams.StartDate = $CurrentParams.EndDate = " "
+        $StartDate = $EndDate = " "
+    }
     $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
         Where {Test-Path variable:$_}| Foreach {
             $CurrentParams.Add($_, (Get-Variable $_).value)
@@ -405,39 +421,31 @@ Begin {
     
     #region Parameter things
 
-    If ($AllDates.IsPresent -and $StartDate) {
-        $Msg = "You have selected -AllDates; StartDate and EndDate values will be ignored"
-        Write-Warning $Msg
-        $StartDate = ""
-    }
-    Else {
-        If ($StartDate -and $EndDate) {
-            If (-not ($StartDate -as [datetime])) {
-                $Msg = "'$StartDate' is not a valid date/time; please re-enter StartDate"
+    If ($Source -eq "Dates") {
+        If (-not ($StartDate -as [datetime])) {
+            $Msg = "'$StartDate' is not a valid date/time; please re-enter StartDate"
+            $Host.UI.WriteErrorLine($Msg)
+            Break
+        }
+        If (-not ($EndDate -as [datetime])) {
+            $Msg = "'$EndDate' is not a valid date/time; please re-enter EndDate"
+            $Host.UI.WriteErrorLine($Msg)
+            Break
+        }
+        Else {
+            $Start = ($StartDate -as [datetime])
+            $End = ($EndDate -as [datetime])
+            If ($Start -gt (Get-Date)) {
+                $Msg = "Time travel is not permitted; please enter a start date earlier than $((Get-Date).ToString())"
                 $Host.UI.WriteErrorLine($Msg)
                 Break
             }
-            If (-not ($EndDate -as [datetime])) {
-                $Msg = "'$EndDate' is not a valid date/time; please re-enter EndDate"
+            If (-not ($End -ge $Start)) {
+                $Msg = "Time travel is not permitted; please enter an end date later than or equal to $(($StartDate -as [datetime]).ToString())"
                 $Host.UI.WriteErrorLine($Msg)
                 Break
-            }
-            Else {
-                $Start = ($StartDate -as [datetime])
-                $End = ($EndDate -as [datetime])
-                If ($Start -gt (Get-Date)) {
-                    $Msg = "Time travel is not permitted; please enter a start date earlier than $((Get-Date).ToString())"
-                    $Host.UI.WriteErrorLine($Msg)
-                    Break
-                }
-                If (-not ($End -ge $Start)) {
-                    $Msg = "Time travel is not permitted; please enter an end date later than or equal to $(($StartDate -as [datetime]).ToString())"
-                    $Host.UI.WriteErrorLine($Msg)
-                    Break
-                }
             }
         }
-        Else {$StartDate = $EndDate = ""}
     }
     
     #endregion Parameter things
@@ -448,6 +456,7 @@ Begin {
         
         Param($ArgList)
 
+        $Messages = @()
         If ($ArgList.CustomFilePath) {
             If (Test-Path $ArgList.CustomFilePath -PathType Container -EA SilentlyContinue) {
                 $Path = $ArgList.CustomFilePath
@@ -455,11 +464,11 @@ Begin {
                     $ActionFile = Get-ChildItem $CustomFilePath -Recurse -Filter action-history*.txt -EA SilentlyContinue -Force | Get-Item -Force
                 }
                 Catch {
-                    $Msg = "No Tanium client activity logfile found in path '$Path'"
+                    $Messages += "No Tanium client activity logfile found in path '$Path'"
                 }
             }
             Else {
-                $Msg = "Invalid path '$($ArgList.CustomFilePath)"
+                $Messages += "Invalid path '$($ArgList.CustomFilePath)"
             }
         }
         Else {
@@ -468,56 +477,76 @@ Begin {
 
             Try {
                 $Parent = Get-Command -Name $TaniumCommandPath -EA Stop | Select-Object $_.Path | Split-Path -Parent -EA Stop
-                #$ActionFile = Get-ChildItem $Parent -Recurse -Filter action-history*.txt -Force -EA Stop | Get-Item -Force -EA Stop
-                $FileRegex = "\.log|\.txt"
-                $ActionFile = Get-ChildItem $Parent -Recurse -Filter "action*" -Force -EA Stop | Where-Object -FilterScript {$_.Name -match $FileRegex}
+                
+                Switch ($ArgList.LogType) {
+                    $ActionFile {
+                        # This is the file type that has installation status details, etc. 
+                        $ActionFile = Get-ChildItem $Parent -Recurse -Filter action-history*.txt -Force -EA Stop | Get-Item -Force -EA Stop
+                    }
+                    $ActionLogs {
+                        $FileRegex = "\.log|\.txt"
+                        $ActionFile = Get-ChildItem $Parent -Recurse -Filter "action*" -Force -EA Stop | 
+                            Where-Object -FilterScript {$_.Name -match $FileRegex}
+                    }
+                }
             }
             Catch {
-                $Msg = "Something horrible has happened!"
-                If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
+                $Messages += "Something horrible has happened!"
+                If ($ErrorDetails = $_.Exception.Message) {$Messages += "`n$ErrorDetails"}
             }
         }
         
         If ($ActionFile) {
             
+            # If filtering on date, get files created between those dates
+            If ($ArgList.Start -and $ArgList.End) {
+                $ActionFile = $ActionFile | Where-Object { $_.CreationTime -ge $ArgList.Start -and $_.CreationTime -le $ArgList.End }
+            }
             # If there's more than one, and we didn't want all
-            If ($ActionFile.Count -gt 1 -and -not $AllFiles.IsPresent) {
+            ElseIf ($ActionFile.Count -gt 1 -and -not $ArgList.AllFiles.IsPresent) {
                 $ActionFile = $ActionFile | Sort LastWriteTime -Descending | Select -First 1
             }
-            Try { 
+            
+            If ($ActionFile) {
+                Try { 
 
-                If ($LogContent = ($ActionFile | Get-Content -Raw -ErrorAction SilentlyContinue)) {       
+                    If ($LogContent = ($ActionFile | Get-Content -Raw -ErrorAction SilentlyContinue)) {       
                     
-                    # Thanks for the regex help, Jeffery Hicks!
-                    [regex]$rx = "(?<Date>\d{4}.*Z).*Action\s(?<ActionID>\d+).*\s+\[(?<Action>.*)\]:\s+(?<Message>.*)"
+                        # Thanks for all the regex help, Jeffery Hicks!
+                        [regex]$rx = "(?<Date>\d{4}.*Z).*Action\s(?<ActionID>\d+).*\s+\[(?<Action>.*)\]:\s+(?<Message>.*)"
                     
-                    If ($M = $rx.Matches($LogContent)) {
-                        $Output = @()
-                        $Output += Foreach ($item in $m) {
-                            New-Object PSObject -Property @{
-                                Computername = $env:Computername
-                                Date         = $item.groups[1].Value -as [datetime]
-                                ActionID     = $item.groups[2].value
-                                Action       = $item.groups[3].value
-                                Message      = $item.groups[4].value
+                        If ($M = $rx.Matches($LogContent)) {
+                            $Output = @()
+                            $Output += Foreach ($item in $m) {
+                                New-Object PSObject -Property @{
+                                    Computername = $env:Computername
+                                    Date         = $item.groups[1].Value -as [datetime]
+                                    ActionID     = $item.groups[2].value
+                                    Action       = $item.groups[3].value
+                                    Message      = $item.groups[4].value
+                                }
                             }
+                        }
+                        Else {
+                            Write-Host "HAHAHAHAHAHA" -ForegroundColor Yellow
+                            $Messages += "No match found in $($ActionFile.FullName -join(", "))"
                         }
                     }
                     Else {
-                        $Msg = "No match found in $($ActionFile.FullName -join(", "))"
+                        $Messages += "Failed to get content in $($ActionFile.FullName -join(", "))"
                     }
+                } #end try getting content
+                Catch {
+                    $Messages +=  "Something horrible has happened!"
+                    If ($ErrorDetails = $_.Exception.Message) {$Messages += "`n$ErrorDetails"}
                 }
-                Else {
-                    $Msg = "Failed to get content in $($ActionFile.FullName -join(", "))"
-                }
-            } #end try getting content
-            Catch {
-                $Msg = "Something horrible has happened!"
-                If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
+            } # end if action file exists after filtering
+            Else {
+                $Messages += "No action files found matching filter"
             }
         } #end if input file
         Else {
-            $Msg = "No Tanium action-history file(s) found in path '$Path'"
+            $Messages += "No Tanium action-history file(s) found in path '$Path'"
         }
             
         If (-not $Output) {
@@ -526,7 +555,7 @@ Begin {
                 Date         = "-"
                 ActionID     = "-"
                 Action       = "-"
-                Message      = $Msg
+                Message      = $Messages -join("`n")
             }
         }
         Else {
@@ -534,25 +563,25 @@ Begin {
             # Filter by date and/or action type
             If ($ArgList.ActionTypeFilter) {
                 If (-not ($Output = $Output | Where-Object {$_.Action -match "^$($ArgList.ActionTypeFilter)"})) {
-                    $Msg = "No results found with action filter matching '^$($ArgList.ActionTypeFilter)')"
+                    $Messages += "No results found with action filter matching '^$($ArgList.ActionTypeFilter)')"
                     $Output = New-Object PSObject -Property @{
                         Computername = $Env:Computername
                         Date         = "-"
                         ActionID     = "-"
                         Action       = "-"
-                        Message      = $Msg
+                        Message      = $Messages -join("`n")
                     }
                 }
             }
             If ($ArgList.Start -and $ArgList.End) {
                 If (-not ($Output = $Output | Where-Object {($_.Date -gt $ArgList.Start) -and ($_.Date -lt $ArgList.End)})) {
-                    $Msg = "No results found between $($ArgList.Start.ToString()) and $($ArgList.End.ToString())"
+                    $Messages += "No results found between $($ArgList.Start.ToString()) and $($ArgList.End.ToString())"
                     $Output = New-Object PSObject -Property @{
                         Computername = $Env:Computername
                         Date         = "-"
                         ActionID     = "-"
                         Action       = "-"
-                        Message      = $Msg
+                        Message      = $Messages -join("`n")
                     }
                 }
             }
@@ -584,13 +613,13 @@ Begin {
         Else {Write-Verbose "$Message"}
     }
 
-    # Function to write an error or a verbose message
+    # Function to output an error as a string (no stacktrace), or write actual error
     Function Write-MessageError {
         [CmdletBinding()]
         Param([Parameter(ValueFromPipeline)]$Message)
-        $BGColor = $host.UI.RawUI.BackgroundColor
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
         If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("$Message")}
-        Else {Write-Verbose "$Message"}
+        Else {Write-Error "$Message"}
     }
 
     # Function to test WinRM connectivity
@@ -626,10 +655,16 @@ Begin {
     $ArgList = @{}
     $ArgList = @{
         CustomFilePath   = $CustomFilePath
-        Start            = $Start
-        End              = $End
+        LogType          = $LogType
         ActionTypeFilter = $ActionTypeFilter
         DateSort         = $DateSort
+    }
+    If ($Source -eq "Dates") {
+        $ArgList.Add("Start",$StartDate)
+        $ArgList.Add("End",$EndDate)
+    }
+    If ($AllFiles.IsPresent) {
+        $ArgList.Add("Allfiles",$True)
     }
 
     # Splats for Invoke-Command (remote)

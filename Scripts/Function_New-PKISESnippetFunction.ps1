@@ -13,13 +13,15 @@ Function New-PKISESnippetFunction {
     Name    : Function_New-PKISESnippetFunction.ps1
     Created : 2019-12-12
     Author  : Paula Kingsley
-    Version : 01.0.0000
+    Version : 01.01.0000
     History :
 
         ** PLEASE KEEP $VERSION UPDATED IN BEGIN BLOCK **
 
         v01.00.0000 - 2019-12-12 - Created script based on older, separate snippet functions, now combined into one fun size
-        
+        v01.01.0000 - 2020-02-21 - Updated inner functions within here-strings, and all of the connect AD stuff (now accepts any combo of domain/server or lack of),
+                                   updated inner functions within parent script too
+
 .PARAMETER Type
     Snippet content/type: ActiveDirectory, Generic, InvokeCommand, VMware
 
@@ -32,8 +34,12 @@ Function New-PKISESnippetFunction {
 .PARAMETER Force
     Overwrite existing snippet, if found
 
+.PARAMETER Quiet
+    Hide all non-verbose console output (errors will display as errors, not write-host strings)
+
+
 .EXAMPLE
-    PS C:\> New-PKISESnippetFunction -Content ActiveDirectory -Verbose 
+    PS C:\> New-PKISESnippetFunction -Type ActiveDirectory -Verbose 
 
         VERBOSE: PSBoundParameters: 
 	
@@ -50,26 +56,69 @@ Function New-PKISESnippetFunction {
 
         VERBOSE: [Prerequisites] Automatically detected user's full name as 'Paula Kingsley'
 
-        BEGIN: Create PowerShell ISE Snippet 'PK Active Directory Function'
+        [BEGIN: New-PKISESnippetFunction] Create PowerShell ISE Snippet 'PK Active Directory Function'
 
         [LAPTOP12] Snippet 'PK Active Directory Function' created successfully
 
-            Directory: C:\Users\paula\WindowsPowerShell\Snippets
+            Directory: C:\Users\jbloggs\WindowsPowerShell\Snippets
 
         Mode                LastWriteTime         Length Name                                                                                                                                                                                                
         ----                -------------         ------ ----                                                                                                                                                                                                
         -a----       2019-12-12   3:17 PM          18322 PK Active Directory Function.snippets.ps1xml                                                                                                                                                        
 
-        END  : Create PowerShell ISE Snippet 'PK Active Directory Function'
+        [END: New-PKISESnippetFunction] Create PowerShell ISE Snippet 'PK Active Directory Function'
+
 
 .EXAMPLE
-    PS C:\> New-PKISESnippetFunction -Content InvokeCommand -Author "Barbara Hendricks" -Force -Quiet
+    PS C:\> New-PKISESnippetFunction -Type InvokeCommand -Author "Barbara Hendricks" -Force -Quiet
 
         Directory: C:\Users\jbloggs\WindowsPowerShell\Snippets
 
         Mode                LastWriteTime         Length Name                                                                                                                                                                                                
         ----                -------------         ------ ----                                                                                                                                                                                                
         -a----       2019-12-12   3:19 PM          12826 PK Invoke-Command function.snippets.ps1xml       
+
+
+.EXAMPLE
+    PS C:\>"VMware","Generic","InvokeCommand","ActiveDirectory" | Foreach-Object {New-PKISESnippetFunction -Type $_  -Force -Quiet}
+
+
+        Directory: C:\Users\jbloggs\WindowsPowerShell\Snippets
+
+
+        Mode                LastWriteTime         Length Name                                                                                        
+        ----                -------------         ------ ----                                                                                        
+        -a----       2020-02-21   2:55 PM          12995 PK VMware Function.snippets.ps1xml                                                          
+        -a----       2020-02-21   2:55 PM           8137 PK Generic Function.snippets.ps1xml                                                         
+        -a----       2020-02-21   2:55 PM          14291 PK Invoke-Command function.snippets.ps1xml                                                  
+        -a----       2020-02-21   2:55 PM          21407 PK Active Directory Function.snippets.ps1xml  
+
+.EXAMPLE
+    PS C:\> New-PKISESnippetFunction -Type VMware
+
+        [BEGIN: New-PKISESnippetFunction] Create PowerShell ISE Snippet 'PK VMware Function'
+
+        [LAPTOP] ERROR: Snippet 'PK VMware Function' already exists; specify -Force to overwrite
+
+            Directory: C:\Users\jbloggs\WindowsPowerShell\Snippets
+
+
+        Mode                LastWriteTime         Length Name                                                                                        
+        ----                -------------         ------ ----                                                                                        
+        -a----       2020-02-21   2:55 PM          12995 PK VMware Function.snippets.ps1xml                                                          
+
+        [END New-PKISESnippetFunction] Create PowerShell ISE Snippet 'PK VMware Function'
+
+.EXAMPLE
+    PS C:\>New-PKISESnippetFunction -Type VMware -Quiet
+
+        Write-MessageError : [UST028036292753] ERROR: Snippet 'PK VMware Function' already exists; specify -Force to overwrite
+        At C:\Users\jbloggs\git\PKTools\Scripts\Function_New-PKISESnippetFunction.ps1:1849 char:42
+        +             "[$Env:ComputerName] $Msg" | Write-MessageError
+        +                                          ~~~~~~~~~~~~~~~~~~
+            + CategoryInfo          : NotSpecified: (:) [Write-Error], WriteErrorException
+            + FullyQualifiedErrorId : Microsoft.PowerShell.Commands.WriteErrorException,Write-MessageError
+ 
 
 
 #>
@@ -106,7 +155,7 @@ Param(
     [switch]$Force,
 
     [Parameter(
-        HelpMessage = "Hide all non-verbose console output"
+        HelpMessage = "Hide all non-verbose console output (errors will display as errors, not write-host strings)"
     )]
     [Alias("SuppressConsoleOutput")]
     [switch]$Quiet
@@ -114,10 +163,11 @@ Param(
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.0.0000"
+    [version]$Version = "01.01.0000"
     
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
+    $ScriptName = $MyInvocation.MyCommand.Name
     If ($Source -eq "Auto") {$PSBoundParameters.AutoDetectAuthor = $AutoDetectAuthor = $True}
     $CurrentParams = $PSBoundParameters
     
@@ -125,14 +175,10 @@ Begin {
         Where {Test-Path variable:$_}| Foreach {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-    $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
+    $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
-
-    # Preferences 
-    $ErrorActionPreference = "Stop"
-    $ProgressPreference = "Continue"
 
     #region Functions
 
@@ -147,11 +193,36 @@ Begin {
         Else {Write-Verbose "$Message"}
     }
 
-    # Function to write an error as a string (no stacktrace)
+    # Function to write an error as a string (no stacktrace), or an error, and options for prefix to string
     Function Write-MessageError {
         [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message)
-        $Host.UI.WriteErrorLine("$Message")
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        If (-not $Quiet.IsPresent) {
+            $Host.UI.WriteErrorLine("$Message")
+        }
+        Else {Write-Error "$Message"}
+    }
+    # Function to write a warning, with any error data, and options for prefix to string
+    Function Write-MessageWarning {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Warning $Msg
+    }
+
+    # Function to write an error/warning, collecting error data
+    Function Write-MessageVerbose {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Verbose $Msg
     }
 
     # Function to get user's full name from registry based on WMI/SID
@@ -190,7 +261,7 @@ Begin {
 
     If (-not $PSISE) {
         $Msg = "This function requires the PowerShell ISE environment"
-        "[$Env:ComputerName] $Msg" | Write-MessageError
+        $Msg | Write-MessageError -PrefixPrerequisites
         Break
     }
 
@@ -198,22 +269,22 @@ Begin {
         Manual {
             If ($CurrentParams.Author) {
                 $Msg = "Author name manually specified as '$Author'"
-                Write-Verbose "[Prerequisites] $Msg"
+                $Msg | Write-MessageVerbose -PrefixPrerequisites
             }
             Else {
                 $Msg = "Author name must be provided when -AuthorNameOption is set to 'Manual'"
-                "[Prerequisites] $Msg" | Write-MessageError
+                $Msg | Write-MessageError -PrefixPrerequisites
                 Break
             }
         }
         Auto   {
             If ($Author = GetFullName) {
                 $Msg = "Automatically detected user's full name as '$Author'"
-                Write-Verbose "[Prerequisites] $Msg"
+                $Msg | Write-MessageVerbose -PrefixPrerequisites
             }
             Else {
                 $Msg = "Failed to detect/construct current user's full name; please re-run script using the -Author parameter"
-                "[Prerequisites] $Msg" | Write-MessageError
+                $Msg | Write-MessageError -PrefixPrerequisites
                 Break
             }
         }
@@ -232,7 +303,8 @@ Begin {
             $SnippetName = "PK Active Directory Function"
             $Description = "Snippet to create a new generic Active Directory function; created using New-PKISESnippetFunction -Type ActiveDirectory"
             
-            $Body = @'
+$Body = @'
+
 #Requires -version 4
 Function Do-SomethingCool {
 <# 
@@ -297,7 +369,7 @@ Param (
         HelpMessage = "Active Directory domain name or FQDN (default is current user's domain)"
     )]
     [ValidateNotNullOrEmpty()]
-    [string] $ADDomain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name,
+    [string] $ADDomain, # = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name,
 
     [Parameter(
         HelpMessage = "Starting Active Directory path/organizational unit (default is root of current user's domain)"
@@ -321,11 +393,12 @@ Param (
 )
 Begin {
     
-     # Current version (please keep up to date from comment block)
+    # Current version (please keep up to date from comment block)
     [version]$Version = "01.00.0000"
 
     # How did we get here
     $Source = $PSCmdlet.ParameterSetName
+    $ScriptName = $MyInvocation.MyCommand.Name
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
 
     # Show our settings
@@ -336,15 +409,13 @@ Begin {
         }
     $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ParameterSetName",$Source)
-    $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
+    $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
     # Preferences
     $ErrorActionPreference = "Stop"
-    $ProgressPreference = "Continue"
-    $WarningPreference = "Continue"
-
+    
     #region Functions
     # Mix, match, use, discard, whatever
 
@@ -359,93 +430,242 @@ Begin {
         Else {Write-Verbose "$Message"}
     }
 
-    # Function to write an error as a string (no stacktrace)
+    # Function to write an error as a string (no stacktrace), or an error, and options for prefix to string
     Function Write-MessageError {
         [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message)
-        $Host.UI.WriteErrorLine("$Message")
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        If (-not $Quiet.IsPresent) {
+            $Host.UI.WriteErrorLine("$Message")
+        }
+        Else {Write-Error "$Message"}
+    }
+    # Function to write a warning, with any error data, and options for prefix to string
+    Function Write-MessageWarning {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Warning $Msg
     }
 
-    # Function to get the AD domain
-    Function GetDomain {
-        Param($ADDomain,$Credential)
-        $Param_GetAD = @{}
-        $Param_GetAD = @{
-            Identity    = $ADDomain
-            ErrorAction = "Stop"
-            Verbose     = $False
-        }
-        If ($PSBoundParameters.Credential) {
-            $Param_GetAD.Add("Credential",$Credential)
-        }
-        Try {
-            Get-ADDomain @Param_GetAD
-        }
-        Catch {
-            Throw $_.Exception.Message
-        }
+    # Function to write an error/warning, collecting error data
+    Function Write-MessageVerbose {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Verbose $Msg
     }
 
-    # Function to get the first availble DC in the domain
-    Function GetFirstDC {
-        Param($ADDomain)
-        Try {
-            $Param_GetDC = @{}
-            $Param_GetDC = @{
-                DomainName      = $ADDomain
-                Discover        = $True
-                NextClosestSite = $True
-                ErrorAction     = "Stop"
-                Verbose         = $False
-            }
-            Get-ADDomainController @Param_GetDC
-        }
-        Catch {
-            Throw $_.Exception.Message
-        }
-    }
+    # Function to connect to AD with (named or default) AD domain, and (named or default) DC, in order of preference
+    # Outputs global variables for domain object, dc object, and domain name string, and dc name string
+    Function ConnectTo-AD {
+        [CmdletBinding()]
+        Param()
+        $ErrorActionPreference = "Stop"
 
-    # Function to get a named DC
-    Function GetDC {
-        Param($Server,$Credential)
+        # Splats
+        $Param_GetDomain = @{}
+        $Param_GetDomain = @{Identity = $Null}
+        If ($CurrentParams.Credential) {$Param_GetDomain.Add("Credential",$Credential)}
+
         $Param_GetDC = @{}
-        $Param_GetDC = @{
-            Identity    = $Server
-            Server      = $Server
-            ErrorAction = "Stop"
-            Verbose     = $False
-        }
-        If ($PSBoundParameters.Credential) {
-            $Param_GetDC.Add("Credential",$Credential)
-        }
-        Try {
-            Get-ADDomainController @Param_GetDC
-        }
-        Catch {
-            Throw $_.Exception.Message
-        }
-    }
+        If ($CurrentParams.Credential) {$Param_GetDC.Add("Credential",$Credential)}
 
-    # Function to verify searchbase
-    Function GetSearchBase {
-        Param($BaseDN,$Credential)
-            $Param_GetSB = @{}
-            $Param_GetSB = @{
-                Identity    = $BaseDN
-                Server      = $DC
-                ErrorAction = "SilentlyContinue"
-                Verbose     = $False
+        # In order of preference based on parameters
+
+        #region Get a named domain and get any domain controller (this is the easiest)
+
+        If ($CurrentParams.ADDomain -and (-not $CurrentParams.Server)) {
+        
+            Try {
+                $Msg = "Get Active Directory domain '$($CurrentParams.ADDomain)'"
+                $Msg | Write-MessageVerbose -PrefixPrerequisites
+                $Param_GetDomain.Identity = $CurrentParams.ADDomain
+                $DomainObj = Get-ADDomain @Param_GetDomain
+
+                Try {
+                    $Msg = "Get first available domain controller in '$($DomainObj.NetBIOSName)'"
+                    $Msg | Write-MessageVerbose -PrefixPrerequisites
+                    $Param_GetDC.Add("DomainName",$DomainObj.DNSRoot)
+                    $DCObj = Get-ADDomainController -Discover -ForceDiscover @Param_GetDC 
+                }
+                Catch {
+                    $Msg = "Failed to get Active Directory domain controller"
+                    $Msg | Write-MessageError -PrefixPrerequisites
+                    Break
+                }
             }
-        If ($PSBoundParameters.Credential) {
-            $Param_GetSB.Add("Credential",$Credential)
+            Catch {
+                $Msg = "Failed to get Active Directory domain"
+                $Msg | Write-MessageError -PrefixPrerequisites
+                Break
+            }
+        } #end if domain but not domain controller provided
+
+        #endregion Get a named domain and get any domain controller
+
+        #region ...Or get the domain and then the named domain controller (error out if DC isn't in that domain) 
+
+        Elseif ($CurrentParams.ADDomain -and $CurrentParams.Server) {
+            Try {
+                $Msg = "Get Active Directory domain '$($CurrentParams.ADDomain)'"
+                $Msg | Write-MessageVerbose -PrefixPrerequisites
+                $Param_GetDomain.Identity = $CurrentParams.ADDomain
+                $DomainObj = Get-ADDomain @Param_GetDomain
+
+                Try {
+                    $Msg = "Get domain controller '$($CurrentParams.Server)'"
+                    $Msg | Write-MessageVerbose -PrefixPrerequisites
+                    $Param_GetDC.Add("Identity",$CurrentParams.Server)
+                    $Param_GetDC.Add("Server",$CurrentParams.Server)
+                    $DCObj = Get-ADDomainController @Param_GetDC 
+                    If ($DCObj.Domain -ne $DomainObj.DNSRoot)  {
+                        $DCObj = $Null
+                        $Msg = "Domain controller '$($CurrentParams.Server)' is not in domain '$($DomainObj.Domain)'"
+                        $Msg | Write-MessageError -PrefixPrerequisites
+                        Break
+                    }   
+                }
+                Catch {
+                    $Msg = "Failed to get Active Directory domain controller"
+                    $Msg | Write-MessageError -PrefixPrerequisites
+                    Break
+                }
+            }
+            Catch {
+                $Msg = "Failed to get Active Directory domain"
+                $Msg | Write-MessageError -PrefixPrerequisites
+                Break
+            }
+
+        } # end if domain and named DC
+
+        #endregion Or get the domain and then the named domain controller (error out if DC isn't in that domain) 
+
+        #region ...Or get a named domain controller and the domain it's in
+
+        Elseif ($CurrentParams.Server -and (-not $CurrentParams.ADDomain)) {
+            $Msg = "Get named domain controller and associated domain"
+            $Msg | Write-Verbose  -PrefixPrerequisites
+        
+            Try {
+                $Msg = "Get domain controller '$($CurrentParams.Server)'"
+                $Msg | Write-MessageVerbose -PrefixPrerequisites
+                $Param_GetDC.Add("Identity",$CurrentParams.Server)
+                $Param_GetDC.Add("Server",$CurrentParams.Server)
+                $DCObj = Get-ADDomainController @Param_GetDC
+            
+                Try {
+                    $Msg = "Get Active Directory domain '$($DCObj.Domain)'"
+                    $Msg | Write-MessageVerbose -PrefixPrerequisites
+                    $Param_GetDomain.Identity = $DCObj.Domain
+                    $DomainObj = Get-ADDomain @Param_GetDomain
+                }
+                Catch {
+                    $Msg = "Failed to get Active Directory domain"
+                    $Msg | Write-MessageError -PrefixPrerequisites 
+                    Break
+                }
+            }
+            Catch {
+                $Msg = "Failed to get Active Directory domain controller"
+                $Msg | Write-MessageError -PrefixPrerequisites
+                Break
+            }
+        } # end if DC and no domain
+
+        #endregion ...Or get a named domain controller and the domain it's in
+
+        #region ...Or get the current user's domain and the first available domain controller
+
+        Elseif ((-not $CurrentParams.Server) -and (-not $CurrentParams.ADDomain)) {
+        
+            Try {
+                $Msg = "Get current user's Active Directory domain"
+                $Msg | Write-MessageVerbose -PrefixPrerequisites
+                $Param_GetDomain.Identity = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name
+                $DomainObj = Get-ADDomain @Param_GetDomain
+
+                Try {
+                    $Msg = "Get first available domain controller in '$($DomainObj.NetBIOSName)'"
+                    $Msg | Write-MessageVerbose -PrefixPrerequisites
+                    $Param_GetDC.Add("DomainName",$DomainObj.DNSRoot)
+                    $DCObj = Get-ADDomainController -Discover -ForceDiscover @Param_GetDC 
+                }
+                Catch {
+                    $Msg = "Failed to get Active Directory domain controller"
+                    $Msg | Write-MessageError -PrefixPrerequisites
+                    Break
+                }
+            }
+            Catch {
+                $Msg = "Failed to get Active Directory domain"
+                $Msg | Write-MessageError -PrefixPrerequisites
+                Break
+            }
+
+        } #end if no domain or DC provided
+
+        #endregion ...Or get the current user's domain and the first available domain controller
+
+        #region Now get or validate searchbase if we have a DC and domain, and output variables
+
+        If ($DCObj -and $DomainObj) {
+            
+            If ($CurrentParams.SearchBase) {
+                
+                Try {
+                    $Msg = "Validate searchbase"
+                    $Msg | Write-MessageVerbose -PrefixPrerequisites
+                    If ($LookupSearchBase = Get-ADObject -Identity $CurrentParams.SearchBase -Server $($DCObj.HostName) -ErrorAction SilentlyContinue| Where-Object {$_.ObjectClass -in @("OrganizationalUnit","builtinDomain","DomainDNS")}) {
+                        If ($CurrentParams.SearchBase -notmatch $DomainObj.DistinguishedName) {
+                            $Msg = "Searchbase '$($CurrentParams.SearchBase)' does not appear to match domain '$($DomainObj.DistinguishedName)'"
+                            $Msg | Write-MessageError
+                            Break
+                        }
+                        Else {
+                            New-Variable -Name BaseDN -Scope Global -Value $LookupSearchBase.DistinguishedName -Force
+                            $Msg = "Validated searchbase '$BaseDN'"                
+                            $Msg | Write-MessageVerbose -PrefixPrerequisites
+                        }
+                    }
+                    Else {
+                        $Msg = "Failed to validate searchbase '$($CurrentParams.SearchBase)'"
+                        $Msg | Write-MessageError -PrefixPrerequisites
+                    }
+                }
+                Catch {
+                    $Msg = "Failed to validate searchbase '$($CurrentParams.SearchBase)'"
+                    $Msg | Write-MessageError -PrefixPrerequisites
+                    Break
+                }
+            }
+            Else {
+                New-Variable -Name BaseDN -Scope Global -Value $DomainObj.DistinguishedName -Force                
+                $Msg = "Setting searchbase to root of domain, '$BaseDN'"
+                Write-Verbose $Msg
+            }       
+            
+            If ($DCObj -and $DomainObj -and $BaseDN) {
+                New-Variable -Name DomainObj -Scope Global -Value $DomainObj -Force
+                New-Variable -Name DCObj -Scope Global -Value $DCObj -Force
+                New-Variable -Name DC -Scope Global -Value $($DCObj.Hostname) -Force
+                New-Variable -Name Domain -Scope Global -Value $($DomainObj.DNSRoot) -Force
+
+                $Msg = "Successfully connected to domain controller '$DC' in domain '$Domain' with searchbase '$BaseDN'"
+                $Msg | Write-MessageVerbose -PrefixPrerequisites
+            }
         }
-        Try {
-            Get-ADObject @Param_GetSB
-        }
-        Catch {
-            Throw $_.Exception.Message
-        }
-    }
+
+        #endregion Now get or validate searchbase if we have a DC and domain, and output variables
+        
+    } #end ConnectTo-AD
 
     # Convert DN to CN
     function Get-CanonicalName ([string[]]$DistinguishedName) {    
@@ -466,164 +686,45 @@ Begin {
     $Activity = "Prerequisites"
 
     # Make sure AD module is loaded
-    # Use this only if not using a -Requires statement, which you may not want to do if this is part of a module containing non-AD-related functions
+    # Use this only if not using a -Requires statement, which you may not want to do if this is part of a module 
+    # containing non-AD-related functions too. Your call!
 
     $Msg = "Verify ActiveDirectory module"
-    Write-Verbose "[Prerequisites] $Msg"
+    $Msg | Write-MessageVerbose -PrefixPrerequisites
     Write-Progress -Activity $Activity -CurrentOperation $Msg
 
     Try {
         If ($Module = Get-Module -Name ActiveDirectory -ListAvailable -ErrorAction SilentlyContinue -Verbose:$False) {
             $Msg = "Successfully located ActiveDirectory module version $($Module.Version.ToString())"
-            Write-Verbose "[Prerequisites] $Msg"
+            $Msg | Write-MessageVerbose -PrefixPrerequisites
         }
         Else {
             $Msg = "Failed to find ActiveDirectory module in PSModule path"
-            "[Prerequisites] $Msg" | Write-MessageError 
+            $Msg | Write-MessageError -PrefixPrerequisites
             Break
         }
     }
     Catch {
         $Msg = "Failed to find ActiveDirectory module"
-        If ($ErrorDetails = $_.exception.message) {$Msg += " ($ErrorDetails)"}
-        "[Prerequisites] $Msg" | Write-MessageError 
+        $Msg | Write-MessageError -PrefixPrerequisites
         Break
     }
 
-    # Verify AD and a domain controller
+    #region Prerequisites 
 
     $Msg = "Connect to Active Directory"
     Write-Verbose "[Prerequisites] $Msg"
     Write-Progress -Activity $Activity -CurrentOperation $Msg
 
-    Try {
-        $Param_GetAD = @{}
-        $Param_GetAD = @{
-            Identity    = $ADDomain
-            ErrorAction = "Stop"
-            Verbose     = $False
-        }
-        If ($CurrentParams.Credential) {
-            $Param_GetAD.Add("Credential",$Credential)
-        }
-        $ADConfirm = Get-ADDomain @Param_GetAD
-        $Msg = "Successfully connected to '$($ADConfirm.DNSRoot.Tolower())'"
-        Write-Verbose "[Prerequisites] $Msg"
-        
-        # Get the domain controller
-        If (-not $CurrentParams.Server) {
-            
-            $Msg = "Find nearest domain controller"
-            Write-Verbose "[Prerequisites] $Msg"
-            
-            Try {        
-                $Param_GetDC = @{}
-                $Param_GetDC = @{
-                    DomainName      = $ADDomain
-                    Discover        = $True
-                    NextClosestSite = $True
-                    ErrorAction     = "Stop"
-                    Verbose         = $False
-                }
-                $DCObj = Get-ADDomainController @Param_GetDC
-                $DC = $($DCObj.HostName)
-                $Msg = "Successfully connected to '$DC'"
-                Write-Verbose "[Prerequisites] $Msg"
-            }
-            Catch {
-                $Msg = "Failed to find domain controller for '$($ADConfirm.DNSRoot.Tolower())'"
-                If ($ErrorDetails = $_.exception.message) {$Msg += "; $ErrorDetails"}
-                "[Prerequisites] $Msg" | Write-MessageError
-                Break
-            }    
-        }
-        Else {
-            $Msg = "Connect to named domain controller"
-            Write-Verbose "[Prerequisites] $Msg"
+    ConnectTo-AD #-verbose
 
-            Try {        
-                $Param_GetDC = @{}
-                $Param_GetDC = @{
-                    Identity    = $Server
-                    ErrorAction = "Stop"
-                    Verbose     = $False
-                }
-                If ($CurrentParams.Credential) {
-                    $Param_GetDC.Add("Credential",$Credential)
-                }
-                $DCObj = Get-ADDomainController @Param_GetDC
-                If ($DCObj.Domain -eq $ADConfirm.DNSRoot) {
-                    $DC = $($DCObj.HostName)
-                    $Msg = "Successfully connected to '$DC'"
-                    Write-Verbose "[Prerequisites] $Msg"
-                }
-                Else {
-                    $Msg = "Domain controller '$($DCObj.HostName)' is not in domain '$($ADConfirm.DNSRoot)'"
-                    "[Prerequisites] $Msg" | Write-MessageError
-                    Break
-                }
-            }
-            Catch {
-                $Msg = "Failed to find domain controller'$Server' in '$($ADConfirm.DNSRoot.Tolower())'"
-                If ($ErrorDetails = $_.exception.message) {$Msg += "; $ErrorDetails"}
-                "[Prerequisites] $Msg" | Write-MessageError
-                Break
-            }
-        }    
-        # Get or verify the searchbase
-        If ($DCObj) {
-                
-            If ($CurrentParams.Searchbase) {
-
-                $Msg = "Verify searchbase"
-                Write-Verbose "[Prerequisites] $Msg"
-                Write-Progress -Activity "Prerequisites" -CurrentOperation $Msg
-
-                $Param_GetBaseDN = @{}
-                $Param_GetBaseDN = @{
-                    Identity    = $Searchbase
-                    Server      = $DC
-                    ErrorAction = "SilentlyContinue"
-                    Verbose     = $False
-                }
-
-                Try {
-                    # Overwriting the variable
-                    If ([string]$Searchbase = Get-ADObject @Param_GetBaseDN | Select-Object -ExpandProperty DistinguishedName) {
-                        $Separator = ""
-                        $Msg = "Searchbase set to '$SearchBase'"
-                        Write-Verbose "[Prerequisites] $Msg"
-                    }
-                    Else {
-                        $Msg = "Failed to validate searchbase '$BaseDN' in domain $($ADConfirm.DNSRoot)'"
-                        "[Prerequisites] $Msg" | Write-MessageError
-                        Break
-                    }
-                }
-                Catch {
-                    $Msg = "Failed to validate searchbase '$BaseDN'"
-                    If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
-                    "[Prerequisites] $Msg" | Write-MessageError
-                    Break
-                }
-            }    
-            Else {
-                $Msg = "Set searchbase"
-                Write-Verbose "[Prerequisites] $Msg"
-                Write-Progress -Activity "Prerequisites" -CurrentOperation $Msg
-
-                [string]$Searchbase = $ADConfirm.DistinguishedName
-                $Msg = "Successfully created searchbase as '$SearchBase'"
-                Write-Verbose "[Prerequisites] $Msg"
-            } 
-        } 
-    }
-    Catch [exception] {
-        $Msg = "Failed to connect to AD domain '$ADDomain'"
-        If ($ErrorDetails = $_.exception.Message) {$Msg += " ($ErrorDetails)"}
-        "[Prerequisites] $Msg" | Write-MessageError
+    If (-not ($DC -and $Domain -and $BaseDN)) {
+        $Msg = "[Prerequisites] Failed to connect to Active Directory; please specify a valid domain name and/or domain controller name"
+        $Msg | Write-MessageError
         Break
     }
+
+    #endregion Prerequisites
 
     #endregion Prerequisites
 
@@ -644,7 +745,7 @@ Begin {
     $Param_AD = @{
         Filter      = $Null
         Properties  = $Props
-        Searchbase  = $SearchBase
+        Searchbase  = $BaseDN
         SearchScope = "Subtree"
         Server      = $DC
         ErrorAction = "Stop"
@@ -664,29 +765,10 @@ Begin {
 
     #endregion Splats
 
-    #region Functions
-
-    # Convert DN to CN
-    function Get-CanonicalName ([string[]]$DistinguishedName) {    
-        foreach ($dn in $DistinguishedName) {      
-            $d = $dn.Split(',') ## Split the dn string up into it's constituent parts 
-            $arr = (@(($d | Where-Object { $_ -notmatch 'DC=' }) | ForEach-Object { $_.Substring(3) }))  ## get parts excluding the parts relevant to the FQDN and trim off the dn syntax 
-            [array]::Reverse($arr)  ## Flip the order of the array. 
- 
-            ## Create and return the string representation in canonical name format of the supplied DN 
-            $("{0}/{1}" -f  (($d | Where-Object { $_ -match 'dc=' } | ForEach-Object { $_.Replace('DC=','') }) -join '.'), ($arr -join '/')).TrimEnd("/") 
-        } 
-    }
-
-    #endregion Functions  
-
     # Console output
+    "[BEGIN: $Scriptname] $Activity" | Write-MessageInfo -FGColor Yellow -Title
     
-    "BEGIN: $Activity" | Write-MessageInfo -FGColor -Yellow -Title
-    
-
 } #end begin
-
 Process {
 
     # Counter for progress bar
@@ -722,13 +804,12 @@ Process {
             }
             Catch {
                 $Msg = "Operation failed"
-                If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
                 "[$Computer] $Msg" | Write-MessageError
             }
         }
         Else {
             $Msg = "Operation cancelled by user"
-            $Host.UI.WriteErrorLine("[$Computer] $Msg")
+            "[$Computer] $Msg" | Write-MessageWarning
         }
         
         
@@ -739,7 +820,7 @@ Process {
 End {
     
     $Null = Write-Progress -Activity $Activity -Completed
-    "END  : $Activity" | Write-MessageInfo -FGColor -Yellow -Title
+    "[END $Scriptname] $Activity" | Write-MessageInfo -FGColor Yellow -Title
 }
 
 } # end Do-SomethingCool
@@ -831,6 +912,7 @@ Begin {
 
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
+    $ScriptName = $MyInvocation.MyCommand.Name
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
 
     $CurrentParams = $PSBoundParameters
@@ -840,16 +922,12 @@ Begin {
         }
     $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ParameterSetName",$Source)
-    $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
+    $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
     # Preferences 
     $ErrorActionPreference = "Stop"
-    $ProgressPreference    = "Continue"
-    
-    # Output
-    [array]$Results = @()
     
     #region Functions
 
@@ -864,11 +942,36 @@ Begin {
         Else {Write-Verbose "$Message"}
     }
 
-    # Function to write an error as a string (no stacktrace)
+    # Function to write an error as a string (no stacktrace), or an error, and options for prefix to string
     Function Write-MessageError {
         [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message)
-        $Host.UI.WriteErrorLine("$Message")
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        If (-not $Quiet.IsPresent) {
+            $Host.UI.WriteErrorLine("$Message")
+        }
+        Else {Write-Error "$Message"}
+    }
+    # Function to write a warning, with any error data, and options for prefix to string
+    Function Write-MessageWarning {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Warning $Msg
+    }
+
+    # Function to write a verbose message, collecting error data
+    Function Write-MessageVerbose {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Verbose $Msg
     }
 
     #endregion Functions
@@ -903,7 +1006,7 @@ Begin {
     #endregion Splats
 
     # Console output
-    "BEGIN: $Activity" | Write-MessageInfo -FGColor Yellow -Title
+    "[BEGIN: $ScriptName] $Activity" | Write-MessageInfo -FGColor Yellow -Title
     
 
 
@@ -967,7 +1070,7 @@ Process {
 End {
     
     $Null = Write-Progress -Activity $Activity -Completed
-    "END  : $Activity" | Write-MessageInfo -FGColor Yellow -Title
+    "[END $ScriptName] $Activity" | Write-MessageInfo -FGColor Yellow -Title
 }
 
 } # end Do-SomethingCool
@@ -1092,6 +1195,7 @@ Begin {
 
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
+    $ScriptName = $MyInvocation.MyCommand.Name
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     
     $CurrentParams = $PSBoundParameters
@@ -1102,14 +1206,13 @@ Begin {
     If (-not $PipelineInput.IsPresent -and -not $CurrentParams.ComputerName) {
         $ComputerName = $CurrentParams.ComputerName = $Env:ComputerName
     }
-    $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
+    $CurrentParams.Add("ScriptName",$Scriptname)
     $CurrentParams.Add("ScriptVersion",$Version)
     $CurrentParams.Add("PipelineInput",$PipelineInput)
-    Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
+    Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | Out-String )"
 
     # Preferences 
     $ErrorActionPreference = "Stop"
-    $ProgressPreference    = "Continue"
     
     #region Scriptblock for Invoke-Command
 
@@ -1140,11 +1243,36 @@ Begin {
         Else {Write-Verbose "$Message"}
     }
 
-    # Function to write an error as a string (no stacktrace)
+    # Function to write an error as a string (no stacktrace), or an error, and options for prefix to string
     Function Write-MessageError {
         [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message)
-        $Host.UI.WriteErrorLine("$Message")
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        If (-not $Quiet.IsPresent) {
+            $Host.UI.WriteErrorLine("$Message")
+        }
+        Else {Write-Error "$Message"}
+    }
+    # Function to write a warning, with any error data, and options for prefix to string
+    Function Write-MessageWarning {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Warning $Msg
+    }
+
+    # Function to write a verbose message, collecting error data
+    Function Write-MessageVerbose {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Verbose $Msg
     }
 
     # Function to test WinRM connectivity
@@ -1209,8 +1337,7 @@ Begin {
     #endregion Splats
 
     # Console output
-    $Msg = "BEGIN  : $Activity"
-    $Msg | Write-MessageInfo -FGColor Yellow -Title
+    "[BEGIN: $ScriptName] $Activity" | Write-MessageInfo -FGColor Yellow -Title
 
 
 } #end begin
@@ -1352,9 +1479,7 @@ End {
         }
     } #end if AsJob
 
-
-    $Msg = "END    : $Activity"
-    $Msg | Write-MessageInfo -FGColor Yellow -Title
+    "[BEGIN: $ScriptName] $Activity" | Write-MessageInfo -FGColor Yellow -Title
 
 
 }
@@ -1446,6 +1571,7 @@ Begin {
 
     # How did we get here
     $Source = $PSCmdlet.ParameterSetName
+    $Scriptname = $MyInvocation.MyCommand.Name
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     
     # Show our settings
@@ -1456,7 +1582,7 @@ Begin {
         }
     $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ParameterSetName",$Source)
-    $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
+    $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
     
@@ -1485,11 +1611,36 @@ Begin {
         Else {Write-Verbose "$Message"}
     }
 
-    # Function to write an error as a string (no stacktrace)
+    # Function to write an error as a string (no stacktrace), or an error, and options for prefix to string
     Function Write-MessageError {
         [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message,[switch]$Force)
-        $Host.UI.WriteErrorLine("$Message")
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        If (-not $Quiet.IsPresent) {
+            $Host.UI.WriteErrorLine("$Message")
+        }
+        Else {Write-Error "$Message"}
+    }
+    # Function to write a warning, with any error data, and options for prefix to string
+    Function Write-MessageWarning {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Warning $Msg
+    }
+
+    # Function to write a verbose message, collecting error data
+    Function Write-MessageVerbose {
+        [CmdletBinding()]
+        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
+        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
+        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
+        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
+        Write-Verbose $Msg
     }
 
     # Function to test vCenter connection
@@ -1534,23 +1685,23 @@ Begin {
     #region Prerequisites
     
     $Msg = "Validate PowerCLI module"
-    Write-Verbose "[Prerequisites] $Msg"
+    $Msg | Write-Verbose  -PrefixPrerequisites
     Write-Progress -Activity $Msg
 
     # Check for PowerCLI...using this instead of #Requires to ensure entire GNOpsWindowsVM module loads, regardless of PowerCLI availability
     Try {
         If ($PCLIMod = Get-Module VMware.PowerCLI -ErrorAction SilentlyContinue -Verbose:$False -Debug:$False) {
             $Msg = "Verified PowerCLI module is available (version $($PCLIMod.Version.toString()))"
-            Write-Verbose "[Prerequisites] $Msg"
+            $Msg | Write-Verbose -PrefixPrerequisites
         }
         Else {
             If ($PCLIMod = Get-Module VMware.PowerCLI -ErrorAction SilentlyContinue -Verbose:$False -Debug:$False -ListAvailable | Import-Module -Force -PassThru -Verbose:$False -ErrorAction -Stop) {
                 $Msg = "Verified PowerCLI module is available (version $($PCLIMod.Version.toString()))"
-                Write-Verbose "[Prerequisites] $Msg"
+                $Msg | Write-Verbose -PrefixPrerequisites
             }
             Else {
                 $Msg = "Failed to detect VMware PowerCLI module loaded in this session; please ensure it is already loaded or install it from https://www.powershellgallery.com/packages/VMware.PowerCLI"
-                "[Prerequisites] $Msg" | Write-MessageError -Force
+                $Msg | Write-MessageError -PrefixPrerequisites-Force
                 Break
             }
         }
@@ -1558,12 +1709,12 @@ Begin {
     Catch {
         $Msg = "Failed to detect VMware PowerCLI module loaded in this session; please ensure it is installed from https://www.powershellgallery.com/packages/VMware.PowerCLI"
         If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n $ErrorDetails"}
-        "[Prerequisites] $Msg" | Write-MessageError -Force
+        $Msg | Write-MessageError -PrefixPrerequisites
         Break
     }
 
     $Msg = "Test vCenter connection"
-    Write-Verbose "[Prerequisites] $Msg"
+    $Msg | Write-Verbose  -PrefixPrerequisites
     Write-Progress -Activity $Msg
     
     If ($CurrentParams.VIServer) {
@@ -1571,11 +1722,11 @@ Begin {
         $VIServer | Foreach-Object {
             If (TestVISession -Server $_ -Verbose:$False) {
                 $Msg = "Connection found to vCenter '$_'"
-                Write-Verbose "[Prerequisites] $Msg"
+                $Msg | Write-Verbose -PrefixPrerequisites
             }
             Else {
                 $Msg = "No connection found to vCenter '$_'"
-                "[Prerequisites] $Msg" | Write-MessageError -Force
+                $Msg | Write-MessageError -PrefixPrerequisites
                 Break
             }
         }
@@ -1583,11 +1734,11 @@ Begin {
     Else {
         If ($VIServer = TestVISession -Verbose:$False) {
             $Msg = "Connection found to vCenter '$($VIServer -join(''', '''))'"
-            Write-Verbose "[Prerequisites] $Msg"
+            $Msg | Write-Verbose  -PrefixPrerequisites
         }
         Else {
             $Msg = "No connection found to vCenter"
-            "[Prerequisites] $Msg" | Write-MessageError -Force
+            $Msg | Write-MessageError -PrefixPrerequisites
             Break
         }
     }
@@ -1600,8 +1751,7 @@ Begin {
         }
         Catch {
             $Msg = "Failed to set PowerCLI WebOperationTimeoutSeconds to 3600; lengthy operations may fail"
-            If ($ErrorDetails = $_.exception.Message) {$Msg += " ($ErrorDetails)"}
-            Write-Warning $Msg
+            $Msg | Write-MessageWarning -PrefixPrerequisites
         }
     }   
 
@@ -1639,7 +1789,7 @@ Begin {
     #endregion Splats
  
     # Console output
-    "BEGIN  : $Activity" | Write-MessageInfo -FGColor Yellow -Title
+    "[BEGIN: $ScriptName] $Activity" | Write-MessageInfo -FGColor Yellow -Title
 
 } #end begin
 
@@ -1695,7 +1845,7 @@ Process {
 End {
     
     Write-Progress -Activity $Activity -Completed
-    "END    : $Activity" | Write-MessageInfo -FGColor Yellow -Title
+    "[BEGIN: $ScriptName] $Activity" | Write-MessageInfo -FGColor Yellow -Title
 }
 
 } # end Do-SomethingCool
@@ -1730,17 +1880,15 @@ End {
 
     # What are we doing
     $Activity = "Create PowerShell ISE Snippet '$SnippetName'"
-    "BEGIN: $Activity"| Write-MessageInfo -FGColor Yellow -Title
+    "[BEGIN: $ScriptName] $Activity" | Write-MessageInfo -FGColor Yellow -Title
 }
 Process {
     
     
     # See if it already exists
-
     Write-Progress -Activity $Activity -Status $Env:ComputerName -CurrentOperation 'Test for existing snippet' -PercentComplete (1/3 * 100)
 
-    If (($Test = Get-ISESnippet -ErrorAction SilentlyContinue | 
-        Where-Object {$_.Name -eq $SnippetFile}) -and (-not $Force.IsPresent)) {
+    If (($Test = Get-ISESnippet -ErrorAction SilentlyContinue | Where-Object {$_.Name -eq $SnippetFile}) -and (-not $Force.IsPresent)) {
             $Msg = "ERROR: Snippet '$SnippetName' already exists; specify -Force to overwrite"
             "[$Env:ComputerName] $Msg" | Write-MessageError
             ($Test | Out-String) | Write-MessageInfo -FGColor White
@@ -1791,7 +1939,7 @@ Process {
 End {
     
     Write-Progress -Activity $Activity -Completed
-    "END  : $Activity" | Write-MessageInfo -FGColor Yellow -Title
+    "[END $ScriptName] $Activity" | Write-MessageInfo -FGColor Yellow -Title
 
 }
 } #end New-PKISESnippetFunction
