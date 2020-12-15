@@ -13,7 +13,7 @@ Function New-PKISESnippetFunction {
     Name    : Function_New-PKISESnippetFunction.ps1
     Created : 2019-12-12
     Author  : Paula Kingsley
-    Version : 01.01.0000
+    Version : 01.02.0000
     History :
 
         ** PLEASE KEEP $VERSION UPDATED IN BEGIN BLOCK **
@@ -21,6 +21,7 @@ Function New-PKISESnippetFunction {
         v01.00.0000 - 2019-12-12 - Created script based on older, separate snippet functions, now combined into one fun size
         v01.01.0000 - 2020-02-21 - Updated inner functions within here-strings, and all of the connect AD stuff (now accepts any combo of domain/server or lack of),
                                    updated inner functions within parent script too
+        v01.02.0000 - 2020-04-03 - Updated TestVISession to latest working version, fixed issue with Write-MessageVerbose & Warning (wrong var name for output)
 
 .PARAMETER Type
     Snippet content/type: ActiveDirectory, Generic, InvokeCommand, VMware
@@ -163,7 +164,7 @@ Param(
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.01.0000"
+    [version]$Version = "01.02.0000"
     
     # Show our settings
     $Source = $PSCmdlet.ParameterSetName
@@ -212,7 +213,7 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Warning $Msg
+        Write-Warning $Message
     }
 
     # Function to write an error/warning, collecting error data
@@ -222,7 +223,7 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Verbose $Msg
+        Write-Verbose $Message
     }
 
     # Function to get user's full name from registry based on WMI/SID
@@ -449,7 +450,7 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Warning $Msg
+        Write-Warning $Message
     }
 
     # Function to write an error/warning, collecting error data
@@ -713,14 +714,14 @@ Begin {
     #region Prerequisites 
 
     $Msg = "Connect to Active Directory"
-    Write-Verbose "[Prerequisites] $Msg"
+    $Msg | Write-Verbose -PrefixPrerequisites
     Write-Progress -Activity $Activity -CurrentOperation $Msg
 
     ConnectTo-AD #-verbose
 
     If (-not ($DC -and $Domain -and $BaseDN)) {
-        $Msg = "[Prerequisites] Failed to connect to Active Directory; please specify a valid domain name and/or domain controller name"
-        $Msg | Write-MessageError
+        $Msg = "Failed to connect to Active Directory; please specify a valid domain name and/or domain controller name"
+        $Msg | Write-MessageError -PrefixPrerequisites
         Break
     }
 
@@ -729,14 +730,6 @@ Begin {
     #endregion Prerequisites
 
     #region Splats
-
-    # General purpose splat
-    $StdParams = @{}
-    $StdParams = @{
-        ErrorAction = "Stop"
-        Verbose     = $False
-        Debug       = $False
-    }
 
     # Splat for Get-ADComputer
     $Props = "Name","IPv4Address","Description","Location","OperatingSystem","DistinguishedName","CanonicalName","SID","WhenCreated","ServicePrincipalNames"
@@ -961,7 +954,7 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Warning $Msg
+        Write-Warning $Message
     }
 
     # Function to write a verbose message, collecting error data
@@ -971,20 +964,13 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Verbose $Msg
+        Write-Verbose $Message
     }
 
     #endregion Functions
 
     #region Splats
-
-    # General purpose splat
-    $StdParams = @{}
-    $StdParams = @{
-        ErrorAction = "Stop"
-        Verbose     = $False
-    }
-
+        
     # Splat for Write-Progress
     $Activity = "Do a thing"
     $Param_WP = @{}
@@ -1262,7 +1248,7 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Warning $Msg
+        Write-Warning $Message
     }
 
     # Function to write a verbose message, collecting error data
@@ -1272,7 +1258,7 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Verbose $Msg
+        Write-Verbose $Message
     }
 
     # Function to test WinRM connectivity
@@ -1630,7 +1616,7 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Warning $Msg
+        Write-Warning $Message
     }
 
     # Function to write a verbose message, collecting error data
@@ -1640,68 +1626,90 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Verbose $Msg
+        Write-Verbose $Message
     }
 
     # Function to test vCenter connection
     Function TestVISession {
-    [CmdletBinding()]
-    Param([string]$Server,[switch]$BooleanOutput,[switch]$Quiet)
-        $VCenter = $Null
-        If ($PSBoundParameters.Server) {
-            Try { 
-                If ($vCenter = Get-Variable DefaultVIServers -Scope Global -ErrorAction SilentlyContinue | Where-Object {$_.Value.Name -Match $Server}) {
-                    $Msg = "Connection found to vCenter server '$Server'"
-                    If ($BooleanOutput.IsPresent) {$True}
-                    Else {Write-Output $vCenter.Value.Name}
+    [Cmdletbinding()]
+    Param($Server)
+    $Results = @()
+    $Object = $Null
+    Try {
+        If ($Null = Get-Variable -Name global:defaultviservers -EA SilentlyContinue) {
+
+            If ($global:defaultviservers) {
+                Foreach ($Object in $global:defaultviservers) {
+                    $Msg = "Testing connection to '$($Object.Name)'"
+                    $Msg | Write-MessageVerbose -PrefixPrerequisites
+                    $Results +=([System.Uri]$Object.ServiceUri.AbsoluteUri).Host 
+                }
+                If ($Results) {
+                    If ($PSBoundParameters.ContainsKey("Server")) {
+
+                        $Msg = "vCenter connection found to '$($Results -join("', '"))'"
+                        $Msg | Write-MessageVerbose -PrefixPrerequisites
+                        $MatchingServers = @()
+                        Foreach ($S in $Server) {
+
+                            If ($MatchingServer = $Results | Where-Object {($S -in $_) -or ($_ -match "^$S\.|^$S")}) { 
+                                $Msg = "Verified vCenter connection matching '$S'"
+                                $Msg | Write-MessageVerbose -PrefixPrerequisites
+                                $MatchingServers += $MatchingServer
+                            }
+                            Else {
+                                $Msg = "Failed to verify vCenter connection matching '$S'"
+                                $Msg | Write-MessageError -PrefixPrerequisites
+                            }
+                        }
+                        If ($MatchingServers) {
+                            Write-Output $MatchingServers
+                        }    
+                    }
+                    Else {
+                        Write-Output $Results
+                    }
                 }
                 Else {
-                    $Msg = "No connection found to vCenter server '$Server'"
-                    If ($BooleanOutput.IsPresent) {$False}   
-                    Else {Write-Output $Msg}
+                    $Msg = "Failed to verify vCenter connection"
+                    $Msg | Write-MessageError -PrefixPrerequisites
                 }
             }
-            Catch {}
+            Else {
+                $Msg = "No vCenter connection detected"
+                $Msg | Write-MessageError -PrefixPrerequisites
+            }
         }
         Else {
-            Try {
-                If ($vCenter = Get-Variable DefaultVIServers -Scope Global -ErrorAction SilentlyContinue) {
-                    $Msg = "Connection found to vCenter"
-                    If ($BooleanOutput.IsPresent) {$True}
-                    Else {Write-Output $vCenter.Value}
-                }
-                Else {
-                    $Msg = "No connection found to vCenter"
-                    If ($BooleanOutput.IsPresent) {$False}
-                    Else {Write-Output $Msg}
-                }
-            }
-            Catch {}
+            $Msg = "No vCenter connection detected"
+            $Msg | Write-MessageError -PrefixPrerequisites
         }
-    } #end TestViSession
+    }
+    Catch {}
+    } #end TestVISession
 
     #endregion Functions
 
     #region Prerequisites
     
     $Msg = "Validate PowerCLI module"
-    $Msg | Write-Verbose  -PrefixPrerequisites
+    $Msg | Write-MessageVerbose -PrefixPrerequisites
     Write-Progress -Activity $Msg
 
     # Check for PowerCLI...using this instead of #Requires to ensure entire GNOpsWindowsVM module loads, regardless of PowerCLI availability
     Try {
         If ($PCLIMod = Get-Module VMware.PowerCLI -ErrorAction SilentlyContinue -Verbose:$False -Debug:$False) {
             $Msg = "Verified PowerCLI module is available (version $($PCLIMod.Version.toString()))"
-            $Msg | Write-Verbose -PrefixPrerequisites
+            $Msg | Write-MessageVerbose -PrefixPrerequisites
         }
         Else {
             If ($PCLIMod = Get-Module VMware.PowerCLI -ErrorAction SilentlyContinue -Verbose:$False -Debug:$False -ListAvailable | Import-Module -Force -PassThru -Verbose:$False -ErrorAction -Stop) {
                 $Msg = "Verified PowerCLI module is available (version $($PCLIMod.Version.toString()))"
-                $Msg | Write-Verbose -PrefixPrerequisites
+                $Msg | Write-MessageVerbose -PrefixPrerequisites
             }
             Else {
                 $Msg = "Failed to detect VMware PowerCLI module loaded in this session; please ensure it is already loaded or install it from https://www.powershellgallery.com/packages/VMware.PowerCLI"
-                $Msg | Write-MessageError -PrefixPrerequisites-Force
+                $Msg | Write-MessageError -PrefixPrerequisites -Force
                 Break
             }
         }
@@ -1714,37 +1722,20 @@ Begin {
     }
 
     $Msg = "Test vCenter connection"
-    $Msg | Write-Verbose  -PrefixPrerequisites
+    $Msg | Write-MessageVerbose -PrefixPrerequisites
     Write-Progress -Activity $Msg
     
     If ($CurrentParams.VIServer) {
-        
-        $VIServer | Foreach-Object {
-            If (TestVISession -Server $_ -Verbose:$False) {
-                $Msg = "Connection found to vCenter '$_'"
-                $Msg | Write-Verbose -PrefixPrerequisites
-            }
-            Else {
-                $Msg = "No connection found to vCenter '$_'"
-                $Msg | Write-MessageError -PrefixPrerequisites
-                Break
-            }
-        }
+        $TestServer = $VIServer
+        $VIServer = TestVISession -server $TestServer -EA SilentlyContinue
     }
     Else {
-        If ($VIServer = TestVISession -Verbose:$False) {
-            $Msg = "Connection found to vCenter '$($VIServer -join(''', '''))'"
-            $Msg | Write-Verbose  -PrefixPrerequisites
-        }
-        Else {
-            $Msg = "No connection found to vCenter"
-            $Msg | Write-MessageError -PrefixPrerequisites
-            Break
-        }
+        $VIServer = TestVISession -EA SilentlyContinue
     }
-    $VIServerStr = "'$($VIServer -join(''', '''))'"
-
+    
     If ($VIServer) {
+        $VIServerStr = "'$($VIServer -join(''', '''))'"
+        
         # Set the timeout to something high
         Try {
             $SetTimeout = Set-PowerCLIConfiguration -WebOperationTimeoutSeconds 3600 -Scope Session -Verbose:$False -Debug:$False -Confirm:$False -ErrorAction SilentlyContinue
@@ -1754,18 +1745,15 @@ Begin {
             $Msg | Write-MessageWarning -PrefixPrerequisites
         }
     }   
+    Else {
+        $Msg = "No connection found to vCenter"
+        $Msg | Write-MessageError -PrefixPrerequisites
+        Break
+    }
 
     #endregion Prerequisites
-
+    
     #region Splats
-
-    # General-purpose splat
-    $StdParams = @{}
-    $StdParams = @{
-        ErrorAction = "Stop"
-        Verbose     = $False
-        Debug       = $False
-    }
 
     # Splat for Write-Progress
     $Activity = "Generic VMware function"

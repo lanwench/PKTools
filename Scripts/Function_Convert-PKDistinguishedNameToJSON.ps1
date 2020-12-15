@@ -6,7 +6,7 @@ Function Convert-PKDistinguishedNameToJSON {
 
 .DESCRIPTION
     Uses Zachary Loeber's Get-ChildOUStructure to output the CanonicalName format of a container/OU as JSON 
-    If no Searchbase provided, domain or server can be provided; defaults to root of current user's domain
+    Converts DistinguishedName format to CanonicalName if needed
     Accepts pipeline input
     Returns a JSON object
 
@@ -21,15 +21,8 @@ Function Convert-PKDistinguishedNameToJSON {
         
         v01.00.0000 - 2020-02-21 - Created script
 
-.PARAMETER SearchBase              
-    Starting Active Directory path/organizational unit (default is root of current user's domain)
-        
-
-.PARAMETER ADDomain             
-    Active Directory domain name or FQDN (default is current user's domain)
-
-.PARAMETER Server               
-    Domain controller name or FQDN (default is first available)
+.PARAMETER DistinguishedName
+    DistinguishedName to parse (will be converted to CanonicalName format if needed)
 
 .PARAMETER Depth
     Depth for JSON output (default is 20)
@@ -37,43 +30,97 @@ Function Convert-PKDistinguishedNameToJSON {
 .PARAMETER Quiet
     Suppress non-verbose console output (outputs errors as errors, not formatted strings)
 
+.EXAMPLE
+    PS C:\> Convert-PKDistinguishedNameToJSON -DistinguishedName domain.com/toplevel/next/nowthis/andmore -Verbose
+
+        VERBOSE: PSBoundParameters: 
+	
+        Key               Value                                   
+        ---               -----                                   
+        DistinguishedName domain.com/toplevel/next/nowthis/andmore
+        Verbose           True                                    
+        Depth             20                                      
+        Quiet             False                                   
+        PipelineInput     False                                   
+        ScriptName        Convert-PKDistinguishedNameToJSON       
+        ScriptVersion     1.0.0                                   
+
+        [BEGIN: Convert-PKDistinguishedNameToJSON] Create JSON output from DistinguishedName to 20 level(s)
+
+        VERBOSE: domain.com/toplevel/next/nowthis/andmore
+        VERBOSE: Processing Subtree for: domain.com
+        VERBOSE: Processing Subtree for: toplevel
+        VERBOSE: Processing Subtree for: next
+        VERBOSE: Processing Subtree for: nowthis
+        VERBOSE: Processing Subtree for: andmore
+        {
+            "path":  "domain.com",
+            "name":  "domain.com",
+            "children":  [
+                             {
+                                 "path":  "domain.com/toplevel",
+                                 "name":  "toplevel",
+                                 "children":  [
+                                                  {
+                                                      "path":  "domain.com/toplevel/next",
+                                                      "name":  "next",
+                                                      "children":  [
+                                                                       {
+                                                                           "path":  "domain.com/toplevel/next/nowthis",
+                                                                           "name":  "nowthis",
+                                                                           "children":  [
+                                                                                            {
+                                                                                                "path":  "domain.com/toplevel/next/nowthis/andmore",
+                                                                                                "name":  "andmore",
+                                                                                                "children":  null
+                                                                                            }
+                                                                                        ]
+                                                                       }
+                                                                   ]
+                                                  }
+                                              ]
+                             }
+                         ]
+        }
+
+        [END Convert-PKDistinguishedNameToJSON] Create JSON output from DistinguishedName to 20 level(s)
 
 .EXAMPLE
-    PS C:\> 
+    PS C:\> Get-ADComputer "CN=LAPTOP88,OU=Tech Lab,OU=NorthAm,OU=Workstations,DC=domain,DC=local" | Convert-PKDistinguishedNameToJSON -Depth 4 -Quiet
+
+    {
+        "path":  "domain.local",
+        "name":  "domain.local",
+        "children":  [
+                         {
+                             "path":  "domain.local/Workstations",
+                             "name":  "Workstations",
+                             "children":  [
+                                              {
+                                                  "path":  "domain.local/Workstations/NorthAm",
+                                                  "name":  "NorthAm",
+                                                  "children":  ""
+                                              }
+                                          ]
+                         }
+                     ]
+    }
+
 
 #> 
 
-[CmdletBinding(
-    DefaultParameterSetName = "Default",
-    SupportsShouldProcess = $True,
-    ConfirmImpact = "High"
-)]
-[OutputType([Array])]
+[CmdletBinding()]
 Param (
     
     [Parameter(
-        ParameterSetName = "Named",
         Position = 0,
+        Mandatory = $True,
         ValueFromPipeline = $True,
         ValueFromPipelineByPropertyName = $True,
-        HelpMessage = "Active Directory path/organizational unit (if not provided, defaults to root of current user's domain)"
+        HelpMessage = "DistinguishedName (will be converted to CanonicalName format if needed)"
     )]
     [ValidateNotNullOrEmpty()]
-    [string]$SearchBase,
-    
-    [Parameter(
-        ParameterSetName = "Default",
-        HelpMessage = "Active Directory domain name or FQDN (default is current user's domain)"
-    )]
-    [ValidateNotNullOrEmpty()]
-    [string] $ADDomain,
-
-    [Parameter(
-        ParameterSetName = "Default",
-        HelpMessage = "Domain controller name or FQDN (default is first available)"
-    )]
-    [ValidateNotNullOrEmpty()]
-    [String] $Server,
+    [string]$DistinguishedName,
 
     [Parameter(
         HelpMessage = "Depth for JSON output (default is 20)"
@@ -106,14 +153,10 @@ Begin {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
     $CurrentParams.Add("PipelineInput",$PipelineInput)
-    $CurrentParams.Add("ParameterSetName",$Source)
     $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
-    # Preferences
-    $ErrorActionPreference = "Stop"
-    
     #region Functions
     # Mix, match, use, discard, whatever
 
@@ -157,213 +200,8 @@ Begin {
         If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
         Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
         If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Verbose $Msg
+        Write-Verbose $Message
     }
-
-    # Function to connect to AD with (named or default) AD domain, and (named or default) DC, in order of preference
-    # Outputs global variables for domain object, dc object, and domain name string, and dc name string
-    Function ConnectTo-AD {
-        [CmdletBinding()]
-        Param()
-        $ErrorActionPreference = "Stop"
-
-        # Splats
-        $Param_GetDomain = @{}
-        $Param_GetDomain = @{Identity = $Null}
-        If ($CurrentParams.Credential) {$Param_GetDomain.Add("Credential",$Credential)}
-
-        $Param_GetDC = @{}
-        If ($CurrentParams.Credential) {$Param_GetDC.Add("Credential",$Credential)}
-
-        # In order of preference based on parameters
-
-        #region Get a named domain and get any domain controller (this is the easiest)
-
-        If ($CurrentParams.ADDomain -and (-not $CurrentParams.Server)) {
-        
-            Try {
-                $Msg = "Get Active Directory domain '$($CurrentParams.ADDomain)'"
-                $Msg | Write-MessageVerbose -PrefixPrerequisites
-                $Param_GetDomain.Identity = $CurrentParams.ADDomain
-                $DomainObj = Get-ADDomain @Param_GetDomain
-
-                Try {
-                    $Msg = "Get first available domain controller in '$($DomainObj.NetBIOSName)'"
-                    $Msg | Write-MessageVerbose -PrefixPrerequisites
-                    $Param_GetDC.Add("DomainName",$DomainObj.DNSRoot)
-                    $DCObj = Get-ADDomainController -Discover -ForceDiscover @Param_GetDC 
-                }
-                Catch {
-                    $Msg = "Failed to get Active Directory domain controller"
-                    $Msg | Write-MessageError -PrefixPrerequisites
-                    Break
-                }
-            }
-            Catch {
-                $Msg = "Failed to get Active Directory domain"
-                $Msg | Write-MessageError -PrefixPrerequisites
-                Break
-            }
-        } #end if domain but not domain controller provided
-
-        #endregion Get a named domain and get any domain controller
-
-        #region ...Or get the domain and then the named domain controller (error out if DC isn't in that domain) 
-
-        Elseif ($CurrentParams.ADDomain -and $CurrentParams.Server) {
-            Try {
-                $Msg = "Get Active Directory domain '$($CurrentParams.ADDomain)'"
-                $Msg | Write-MessageVerbose -PrefixPrerequisites
-                $Param_GetDomain.Identity = $CurrentParams.ADDomain
-                $DomainObj = Get-ADDomain @Param_GetDomain
-
-                Try {
-                    $Msg = "Get domain controller '$($CurrentParams.Server)'"
-                    $Msg | Write-MessageVerbose -PrefixPrerequisites
-                    $Param_GetDC.Add("Identity",$CurrentParams.Server)
-                    $Param_GetDC.Add("Server",$CurrentParams.Server)
-                    $DCObj = Get-ADDomainController @Param_GetDC 
-                    If ($DCObj.Domain -ne $DomainObj.DNSRoot)  {
-                        $DCObj = $Null
-                        $Msg = "Domain controller '$($CurrentParams.Server)' is not in domain '$($DomainObj.Domain)'"
-                        $Msg | Write-MessageError -PrefixPrerequisites
-                        Break
-                    }   
-                }
-                Catch {
-                    $Msg = "Failed to get Active Directory domain controller"
-                    $Msg | Write-MessageError -PrefixPrerequisites
-                    Break
-                }
-            }
-            Catch {
-                $Msg = "Failed to get Active Directory domain"
-                $Msg | Write-MessageError -PrefixPrerequisites
-                Break
-            }
-
-        } # end if domain and named DC
-
-        #endregion Or get the domain and then the named domain controller (error out if DC isn't in that domain) 
-
-        #region ...Or get a named domain controller and the domain it's in
-
-        Elseif ($CurrentParams.Server -and (-not $CurrentParams.ADDomain)) {
-            $Msg = "Get named domain controller and associated domain"
-            $Msg | Write-Verbose  -PrefixPrerequisites
-        
-            Try {
-                $Msg = "Get domain controller '$($CurrentParams.Server)'"
-                $Msg | Write-MessageVerbose -PrefixPrerequisites
-                $Param_GetDC.Add("Identity",$CurrentParams.Server)
-                $Param_GetDC.Add("Server",$CurrentParams.Server)
-                $DCObj = Get-ADDomainController @Param_GetDC
-            
-                Try {
-                    $Msg = "Get Active Directory domain '$($DCObj.Domain)'"
-                    $Msg | Write-MessageVerbose -PrefixPrerequisites
-                    $Param_GetDomain.Identity = $DCObj.Domain
-                    $DomainObj = Get-ADDomain @Param_GetDomain
-                }
-                Catch {
-                    $Msg = "Failed to get Active Directory domain"
-                    $Msg | Write-MessageError -PrefixPrerequisites 
-                    Break
-                }
-            }
-            Catch {
-                $Msg = "Failed to get Active Directory domain controller"
-                $Msg | Write-MessageError -PrefixPrerequisites
-                Break
-            }
-        } # end if DC and no domain
-
-        #endregion ...Or get a named domain controller and the domain it's in
-
-        #region ...Or get the current user's domain and the first available domain controller
-
-        Elseif ((-not $CurrentParams.Server) -and (-not $CurrentParams.ADDomain)) {
-        
-            Try {
-                $Msg = "Get current user's Active Directory domain"
-                $Msg | Write-MessageVerbose -PrefixPrerequisites
-                $Param_GetDomain.Identity = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain().Name
-                $DomainObj = Get-ADDomain @Param_GetDomain
-
-                Try {
-                    $Msg = "Get first available domain controller in '$($DomainObj.NetBIOSName)'"
-                    $Msg | Write-MessageVerbose -PrefixPrerequisites
-                    $Param_GetDC.Add("DomainName",$DomainObj.DNSRoot)
-                    $DCObj = Get-ADDomainController -Discover -ForceDiscover @Param_GetDC 
-                }
-                Catch {
-                    $Msg = "Failed to get Active Directory domain controller"
-                    $Msg | Write-MessageError -PrefixPrerequisites
-                    Break
-                }
-            }
-            Catch {
-                $Msg = "Failed to get Active Directory domain"
-                $Msg | Write-MessageError -PrefixPrerequisites
-                Break
-            }
-
-        } #end if no domain or DC provided
-
-        #endregion ...Or get the current user's domain and the first available domain controller
-
-        #region Now get or validate searchbase if we have a DC and domain, and output variables
-
-        If ($DCObj -and $DomainObj) {
-            
-            If ($CurrentParams.SearchBase) {
-                
-                Try {
-                    $Msg = "Validate searchbase"
-                    $Msg | Write-MessageVerbose -PrefixPrerequisites
-                    If ($LookupSearchBase = Get-ADObject -Identity $CurrentParams.SearchBase -Server $($DCObj.HostName) -ErrorAction SilentlyContinue| Where-Object {$_.ObjectClass -in @("OrganizationalUnit","builtinDomain","DomainDNS")}) {
-                        If ($CurrentParams.SearchBase -notmatch $DomainObj.DistinguishedName) {
-                            $Msg = "Searchbase '$($CurrentParams.SearchBase)' does not appear to match domain '$($DomainObj.DistinguishedName)'"
-                            $Msg | Write-MessageError
-                            Break
-                        }
-                        Else {
-                            New-Variable -Name BaseDN -Scope Global -Value $LookupSearchBase.DistinguishedName -Force
-                            $Msg = "Validated searchbase '$BaseDN'"                
-                            $Msg | Write-MessageVerbose -PrefixPrerequisites
-                        }
-                    }
-                    Else {
-                        $Msg = "Failed to validate searchbase '$($CurrentParams.SearchBase)'"
-                        $Msg | Write-MessageError -PrefixPrerequisites
-                    }
-                }
-                Catch {
-                    $Msg = "Failed to validate searchbase '$($CurrentParams.SearchBase)'"
-                    $Msg | Write-MessageError -PrefixPrerequisites
-                    Break
-                }
-            }
-            Else {
-                New-Variable -Name BaseDN -Scope Global -Value $DomainObj.DistinguishedName -Force                
-                $Msg = "Setting searchbase to root of domain, '$BaseDN'"
-                Write-Verbose $Msg
-            }       
-            
-            If ($DCObj -and $DomainObj -and $BaseDN) {
-                New-Variable -Name DomainObj -Scope Global -Value $DomainObj -Force
-                New-Variable -Name DCObj -Scope Global -Value $DCObj -Force
-                New-Variable -Name DC -Scope Global -Value $($DCObj.Hostname) -Force
-                New-Variable -Name Domain -Scope Global -Value $($DomainObj.DNSRoot) -Force
-
-                $Msg = "Successfully connected to domain controller '$DC' in domain '$Domain' with searchbase '$BaseDN'"
-                $Msg | Write-MessageVerbose -PrefixPrerequisites
-            }
-        }
-
-        #endregion Now get or validate searchbase if we have a DC and domain, and output variables
-        
-    } #end ConnectTo-AD
 
     # Convert DN to CN
     function Get-CanonicalName {
@@ -397,7 +235,7 @@ Begin {
         Base of OU
 
     .EXAMPLE
-        $OUs = @(Get-ADObject -Filter {(ObjectClass -eq "OrganizationalUnit")} -Properties CanonicalName).CanonicalName
+        $OUs = @(Get-ADObject -Filter {(ObjectClass -eq "localanizationalUnit")} -Properties CanonicalName).CanonicalName
         $test = $OUs | Get-ChildOUStructure | ConvertTo-Json -Depth 20
 
     .NOTES
@@ -477,57 +315,10 @@ Begin {
 
     #endregion Functions
 
-    #region Prerequisites
-
-    $Activity = "Prerequisites"
-
-    # Make sure AD module is loaded
-    # Use this only if not using a -Requires statement, which you may not want to do if this is part of a module 
-    # containing non-AD-related functions too. Your call!
-
-    $Msg = "Verify ActiveDirectory module"
-    $Msg | Write-MessageVerbose -PrefixPrerequisites
-    Write-Progress -Activity $Activity -CurrentOperation $Msg
-
-    Try {
-        If ($Module = Get-Module -Name ActiveDirectory -ListAvailable -ErrorAction SilentlyContinue -Verbose:$False) {
-            $Msg = "Successfully located ActiveDirectory module version $($Module.Version.ToString())"
-            $Msg | Write-MessageVerbose -PrefixPrerequisites
-        }
-        Else {
-            $Msg = "Failed to find ActiveDirectory module in PSModule path"
-            $Msg | Write-MessageError -PrefixPrerequisites
-            Break
-        }
-    }
-    Catch {
-        $Msg = "Failed to find ActiveDirectory module"
-        $Msg | Write-MessageError -PrefixPrerequisites
-        Break
-    }
-
-    #region Prerequisites 
-
-    $Msg = "Connect to Active Directory"
-    Write-Verbose "[Prerequisites] $Msg"
-    Write-Progress -Activity $Activity -CurrentOperation $Msg
-
-    ConnectTo-AD #-verbose
-
-    If (-not ($DC -and $Domain -and $BaseDN)) {
-        $Msg = "[Prerequisites] Failed to connect to Active Directory; please specify a valid domain name and/or domain controller name"
-        $Msg | Write-MessageError
-        Break
-    }
-
-    #endregion Prerequisites
-
-    #endregion Prerequisites
-
     #region Splats
 
     # Splat for write-progress
-    $Activity = "Create JSON output from Active Directory organizational unit tree (CanonicalName syntax)"
+    $Activity = "Create JSON output from DistinguishedName to $Depth level(s)"
     $Param_WP = @{}
     $Param_WP = @{
         Activity         = $Activity
@@ -543,14 +334,20 @@ Begin {
 } #end begin
 Process {
 
-    Foreach ($OU in $BaseDN) {
+    Foreach ($DN in $DistinguishedName) {
         
-        $Param_WP.CurrentOperation = $OU
+        $Param_WP.CurrentOperation = $DN
         Write-Progress @Param_WP
-        $OU | Write-MessageVerbose
+        $DN | Write-MessageVerbose
         
-        Get-ChildOUStructure ($BaseDN | Get-CanonicalName) | ConvertTo-Json -Depth $Depth
-                
+        If ($DN -match "CN=") {$DN = $DN | Get-CanonicalName}
+        If ($DN -match "./") {
+            Get-ChildOUStructure $DN | ConvertTo-Json -Depth $Depth           
+        }
+        Else {
+            $Msg = "Invalid DistinguishedName or CanonicalName"
+            $Msg | Write-MessageError
+        }
     }
         
 }
