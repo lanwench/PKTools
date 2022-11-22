@@ -1,4 +1,4 @@
-﻿#Requires -version 3
+﻿#Requires -version 4
 function New-PKCodeSigningCert {
 <#
 .SYNOPSIS
@@ -14,12 +14,13 @@ function New-PKCodeSigningCert {
     Name    : Function_New-PKCodeSigningCert.ps1 
     Created : 2019-05-08
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01.0000
     History :
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK ** 
 
         v01.00.0000 - 2019-05-08 - Created script based on Tobias Weltner's original
+        v01.01.0000 - 2022-10-18 - Minor updates
 
 .LINK
     https://community.idera.com/database-tools/powershell/powertips/b/tips/posts/creating-code-signing-certificates
@@ -136,7 +137,7 @@ function New-PKCodeSigningCert {
 param (
     [Parameter(
         Mandatory = $True,
-        Position=0,
+        Position = 0,
         HelpMessage = "Friendly name for certificate"
     )]
     [System.String]$FriendlyName,
@@ -164,11 +165,12 @@ param (
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01.0000"
 
     # Show our settings
     $ScriptName = $MyInvocation.MyCommand.Name
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
+
     $CurrentParams = $PSBoundParameters
     $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
         Where {Test-Path variable:$_}| Foreach {
@@ -182,32 +184,11 @@ Begin {
     #region Verify OS version
 
     If (-not ($Null = [Environment]::OSVersion.Version -ge (new-object 'Version' 10,0))) {
-        $Msg = "This script requires Windows 10 or Windows Server 2016 at minimum; you are running $((Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption).Caption)"
-        $Host.UI.WriteErrorLine($Msg)
-        Break
+        $Msg = "This script requires Windows 10 or Windows Server 2016 at minimum; you are running $((Get-WMIObject -ClassName Win32_OperatingSystem -Property Caption).Caption)"
+        Throw $Msg
     }
     
     #endregion Verify OS version
-
-    #region Functions
-    
-    # Function to write a console message in color, or write a verbose message if Quiet
-    Function Write-MessageInfo {
-        Param([Parameter(ValueFromPipeline)]$Message,$FGColor)
-        $BGColor = $host.UI.RawUI.BackgroundColor
-        If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,"$Message")}
-        Else {Write-Verbose "$Message"}
-    }
-
-    # Function to write a console error message, or write a warning if Quiet
-    Function Write-MessageError {
-        [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message)
-        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("$Message")}
-        Else {Write-Warning "$Message"}
-    }
-    
-    #endregion Functions
 
     #region Splats
 
@@ -239,10 +220,7 @@ Begin {
     #endregion Splats
 
     # Console output
-    $BGColor = $host.UI.RawUI.BackgroundColor
-    $Msg = "BEGIN  : $Activity"
-    $Msg | Write-MessageInfo -FGColor Yellow  
-
+    Write-Verbose "[BEGIN: $ScriptName] $Activity"
 }    
 
 Process {
@@ -251,52 +229,51 @@ Process {
 
     Try {
         $Msg = "Test for existing self-signed certificate"
-        "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor White
+        Write-Verbose "[$Env:ComputerName] $Msg" 
 
         If ($ExistingCert = Get-Childitem Cert:\CurrentUser\My -ErrorAction Stop | Where-Object {$_.Subject -eq "CN=$Name"}) {
             
             $Msg = "Certificate already exists; please remove it and run this script again"
-            "[$Env:ComputerName] $Msg" | Write-MessageError
+            Write-Warning "[$Env:ComputerName] $Msg" 
             $ExistingCert
         }
         Else {
             $Msg = "Create new self-signed certificate"
-            "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor White
+            Write-Verbose "[$Env:ComputerName] $Msg" 
 
             $ConfirmMsg = "`n`n`tCreate new self-signed certificate for $Env:Username`n`n`tPath: Cert:\CurrentUser\My`n`tSubject: 'CN=$Name`n`tFriendly name: '$FriendlyName'`n`n"
             If ($PSCmdlet.ShouldProcess($Env:ComputerName,$ConfirmMsg)) {
                 Try {
                     $NewCert = New-SelfSignedCertificate @Param_Cert
                     $Msg = "Successfully created self-signed certificate in Cert:\CurrentUser\My"
-                    "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor Green
+                    Write-Verbose "[$Env:ComputerName] $Msg" 
                     $NewCert.ToString()
                 }
                 Catch {
                     $Msg = "Failed to create certificate 'CN=$Name'"
                     If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
-                    "[$Env:ComputerName] $Msg" | Write-MessageError
+                    Write-Warning "[$Env:ComputerName] $Msg" 
                 }
             }
             Else {
                 $Msg = "Operation cancelled by user"
-                "[$Env:ComputerName] $Msg" | Write-MessageInfo -FGColor White
+                Write-Verbose "[$Env:ComputerName] $Msg" 
             }
         }
     }
     Catch {
         $Msg = "Failed to test for existing self-signed certificate"
         If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
-        "[$Env:ComputerName] $Msg" | Write-MessageError
+        Write-Warning "[$Env:ComputerName] $Msg" 
     }
   
 }
 End {
-    
+    Write-Verbose "[END: $ScriptName] $Activity"
     Write-Progress -Activity * -Completed
-    $Msg = "END    : $Activity"
-    $Msg | Write-MessageInfo -FGColor Yellow  
+     
 }
-}
+} #end New-PKWindowsCodeSigningCert
 
 <#
 

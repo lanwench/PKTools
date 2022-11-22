@@ -1,5 +1,5 @@
 #requires -Version 4
-Function Test-PKLdapSslConnection {
+Function Test-PKLdapSSLConnection {
 <#
 .SYNOPSIS
     Tests an LDAPS connection, returning information about the negotiated SSL connection including the server certificate.
@@ -11,9 +11,20 @@ Function Test-PKLdapSslConnection {
     The state message "The LDAP server is unavailable" indicates the server is either offline or unwilling to negotiate an SSL connection
 
 .NOTES
-    2020-09-15 - v01.00.0000 - Forked by Paula from Chris Dent's original, adding Wintelrob's comments from original gist that correct enumeration 
-                               errors in output object when converting $Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm
-                               Made computername mandatory, added begin block, changed and added other stuff 
+    .NOTES
+    Name    : Function_Test-PKLdapSslConnection.ps1
+    Created : 2020-09-15
+    Author  : Paula Kingsley
+    Version : 01.01.0000
+    History :
+        
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+        
+        2020-09-15 - v01.00.0000 - Forked by Paula from Chris Dent's original, adding Wintelrob's comments from original gist that correct enumeration 
+                                   errors in output object when converting $Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm
+                                   Made computername mandatory, added begin block, changed and added other stuff 
+        2022-10-18 - v01.01.0000 - Updates, cleanup, added more comments
+
 .INPUTS
     System.String
 
@@ -23,13 +34,22 @@ Function Test-PKLdapSslConnection {
 .LINK
     https://github.com/WintelRob
 
+.PARAMETER Name
+        One or more computer/server/target names to test
+
+.PARAMETER Port
+    Connection port (default is 636)
+    
+.PARAMETER Credential
+    Credentials to use for the bind attempt (default is none; this command requires no special privileges)
+
 .EXAMPLE
-    PS C:\> Test-LdapSslConnection -computername ldaps-test.nlsn.media -Credential $PKCredMedia -Verbose
+    PS C:\> Test-PKLdapSslConnection -computername ldaps-test.domain.local -Credential (Get-Credential DOMAIN\user) -Verbose
         
         VERBOSE: PSBoundParameters: 	
         Key              Value                                    
         ---              -----                                    
-        ComputerName     ldaps-test.nlsn.media                    
+        ComputerName     ldaps-test.domain.local                    
         Credential       System.Management.Automation.PSCredential
         Verbose          True                                     
         Port             636                                      
@@ -37,7 +57,7 @@ Function Test-PKLdapSslConnection {
         ScriptName       Test-PKLdapSslConnection                 
         ScriptVersion    1.0.0    
 
-        ComputerName         : ldaps-test.nlsn.media
+        ComputerName         : ldaps-test.domain.local
         Port                 : 636
         State                : Connected
         Protocol             : 2048
@@ -48,13 +68,13 @@ Function Test-PKLdapSslConnection {
         KeyExchangeAlgorithm : 44550 (ECDH_Ephem)
         ExchangeStrength     : 256
         X509Certificate      : [Subject]
-                                 CN=ldaps-test.nlsn.media, O="Gracenote, Inc", OU=Information Security, L=Emeryville, S=California, C=US
+                                 CN=ldaps-test.domain.local, O="Test Co", OU=Security, L=San Francisco, S=California, C=US
                        
                                [Issuer]
                                  CN=GlobalSign RSA OV SSL CA 2018, O=GlobalSign nv-sa, C=BE
                        
                                [Serial Number]
-                                 0B940839C3C25D7CC61EC29B
+                                 0B810839C3C25D7rr61EC25E
                        
                                [Not Before]
                                  2020-09-15 12:16:08 PM
@@ -64,18 +84,7 @@ Function Test-PKLdapSslConnection {
                        
                                [Thumbprint]
                                  FB3E093D97BE601E1BD4228B984ADF6E6123BBC2
-                                 Test-LdapSSLConnection
-
-    Attempt to bind using SSL and serverless binding.
-
-.EXAMPLE
-    Test-LdapSSLConnection -ComputerName servername
-        
-    Attempt to negotiate SSL with "servername".
-
-
-
-
+                                 
 #>
 
 [CmdletBinding()]
@@ -87,10 +96,10 @@ Param (
         Mandatory = $True,
         ValueFromPipelineByPropertyName = $true, 
         ValueFromPipeline = $true,
-        HelpMessage = "The name of a computer to test"
+        HelpMessage = "The name of a computer/server to test"
     )]
-    [Alias("DnsHostName")]
-    [String]$ComputerName = "",
+    [Alias("DnsHostName","ComputerName")]
+    [String[]]$Name,
 
     [Parameter(
         HelpMessage = "Connection port (default is 636)"
@@ -100,18 +109,14 @@ Param (
     [Parameter(
         HelpMessage = "Credentials to use for the bind attempt (default is none; this command requires no special privileges)"
     )]
-    [PSCredential]$Credential,
+    [PSCredential]$Credential = [System.Management.Automation.PSCredential]::Empty
 
-    [Parameter(
-        HelpMessage = "Suppress non-verbose console output"
-    )]
-    [switch]$Quiet
 )
 
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01.0000"
 
     # How did we get here
     $ScriptName = $MyInvocation.MyCommand.Name
@@ -130,117 +135,108 @@ Begin {
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
-    # Function to write verbose message, collecting error data, and optional prefixes
-    Function Write-MessageVerbose {
-        [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
-        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
-        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
-        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Verbose $Message
-    }
-
-    # Function to write a console message or a verbose message
-    Function Write-MessageInfo {
-        Param([Parameter(ValueFromPipeline)]$Message,$FGColor,[switch]$Title)
-        $BGColor = $host.UI.RawUI.BackgroundColor
-        If (-not $Quiet.IsPresent) {
-            If ($Title.IsPresent) {$Message = "`n$Message`n"}
-            $Host.UI.WriteLine($FGColor,$BGColor,"$Message")
-        }
-        Else {Write-Verbose "$Message"}
-    }
-
-    # Function to write an error as a string (no stacktrace), or an error, with optional prefixes
-    Function Write-MessageError {
-        [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
-        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
-        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
-        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        If (-not $Quiet.IsPresent) {
-            $Host.UI.WriteErrorLine("$Message")
-        }
-        Else {Write-Error "$Message"}
-    }
-    
-    # Function to write an error/warning, collecting error data, with optional prefixes
-    Function Write-MessageWarning {
-        [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message,[switch]$PrefixPrerequisites,[switch]$PrefixError)
-        If ($PrefixPrerequisites.IsPresent) {$Message = "[Prerequisites] $Message"}
-        Elseif ($PrefixError.IsPresent) {$Message = "ERROR  :  $Message"}
-        If ($ErrorDetails = $_.Exception.Message) {$Message += " ($ErrorDetails)"}
-        Write-Warning $Message
-    }
-
-    #endregion Splats
-
-
+    $Activity = "Test LDAPS connection"
+    $Msg = "[BEGIN: $Scriptname] $Activity" 
+    Write-Verbose $Msg
 
 }
 process {
-
-    Foreach ($Computer in $ComputerName) {
+    
+    $Total = $Name.Count
+    $Current = 0
+    
+    Foreach ($Computer in $Name) {
         
-        $Msg = "[$Computer] Test LDAPS connection"
-        $Msg | Write-MessageVerbose
-
-        $DirectoryIdentifier = New-Object DirectoryServices.Protocols.LdapDirectoryIdentifier($Computer, $Port)
-        if ($PSBoundParameters.ContainsKey("Credential")) {
-            $Connection = New-Object DirectoryServices.Protocols.LdapConnection($DirectoryIdentifier, $Credential.GetNetworkCredential())
-            $Connection.AuthType = [DirectoryServices.Protocols.AuthType]::Basic
-        } 
-        Else {
-            $Connection = New-Object DirectoryServices.Protocols.LdapConnection($DirectoryIdentifier)
-            $Connection.AuthType = [DirectoryServices.Protocols.AuthType]::Kerberos
-        }
-        $Connection.SessionOptions.ProtocolVersion = 3
-        $Connection.SessionOptions.SecureSocketLayer = $True
-
-        # Declare a script level variable which can be used to return information from the delegate.
-        New-Variable LdapCertificate -Scope Script -Force
-
-        # 
-        # Create a callback delegate to retrieve the negotiated certificate.
-        # Note:
-        #   * The certificate is unlikely to return the subject.
-        #   * The delegate is documented as using the X509Certificate type, automatically casting this to X509Certificate2 allows access to more information.
-        $Connection.SessionOptions.VerifyServerCertificate = {
-            param(
-                [DirectoryServices.Protocols.LdapConnection]$Connection,
-                [Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
-            )
-            $Script:LdapCertificate = $Certificate
-            return $true
-        }
-
-        $state = "Connected"  
+        $Current ++
+        
+        $Msg = "Creating new DirectoryServices object using port $Port"
+        Write-Verbose "[$Computer] $Msg"
+        Write-Progress -Activity $Activity -CurrentOperation $Msg -Status $Computer -PercentComplete ($Current/$Total*100)
+        
         Try {
-            $Connection.Bind()
-            $Msg = "[$Computer] LDAPS connection successful"
-            $Msg | Write-MessageInfo -FGColor Green
-        } 
-        Catch {
-            $state = "Connection failed ($($_.Exception.InnerException.Message.Trim()))"
-            $Msg = "[$Computer] LDAPS connection failed"
-            $Msg | Write-MessageError
-        }
+            $DirectoryIdentifier = New-Object DirectoryServices.Protocols.LdapDirectoryIdentifier($Computer, $Port)
+            $Auth = "Kerberos"
+            $Args = @($DirectoryIdentifier)
+            If ($CurrentParams.Credential.Username) {
+                $Args += $Credential.GetNetworkCredential()
+                $Auth = "Basic"
+            }
+            $Connection = New-Object DirectoryServices.Protocols.LdapConnection($Args)
+            $Connection.AuthType = [DirectoryServices.Protocols.AuthType]::$Auth
+            
+            $Connection.SessionOptions.ProtocolVersion = 3
+            $Connection.SessionOptions.SecureSocketLayer = $True
 
-        # Wintelrob's addition:
-        # Code to handle when the system cannot interpret the newer code '44550'
-        # to convert to the algorithm name. We just don't get the type name and
-        # convert the number to a string to combine with the name we think it 
-        # should be.
-        If ([Int]$Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm -eq 44550){
-            $KeyExchangeAlgo = [string]$Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm + ' (ECDH_Ephem)'
-        }
-        Else{
-            #$KeyExchangeAlgo = [Security.Authentication.ExchangeAlgorithmType][Int]$Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm
-            If (-not ($KeyExchangeAlgo = [Security.Authentication.ExchangeAlgorithmType][Int]$Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm)) {
-                $KeyExchangeAlgo = $Null
+            Try {
+
+                # Declare a script level variable which can be used to return information from the delegate.
+                $Msg = "Creating script variable to hold information"
+                Write-Verbose "[$Computer] $Msg"
+                Write-Progress -Activity $Activity -CurrentOperation $Msg -Status $Computer -PercentComplete ($Current/$Total*100)
+                New-Variable LdapCertificate -Scope Script -Force
+
+                $Msg = "Creating callback delegate to retrieve certificate"
+                Write-Verbose "[$Computer] $Msg"
+                Write-Progress -Activity $Activity -CurrentOperation $Msg -Status $Computer -PercentComplete ($Current/$Total*100)
+                <# Create a callback delegate to retrieve the negotiated certificate.
+                    Note:
+                    * The certificate is unlikely to return the subject.
+                    * The delegate is documented as using the X509Certificate type, automatically casting this to X509Certificate2 allows access to more information.
+                #>
+                $Connection.SessionOptions.VerifyServerCertificate = {
+                    param(
+                        [DirectoryServices.Protocols.LdapConnection]$Connection,
+                        [Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
+                    )
+                    $Script:LdapCertificate = $Certificate
+                    return $true
+                }
+
+                $Msg = "Testing connection"
+                Write-Verbose "[$Computer] $Msg"
+                Write-Progress -Activity $Activity -CurrentOperation $Msg -Status $Computer -PercentComplete ($Current/$Total*100)
+
+                $state = "Connected"  
+                Try {
+                    $Connection.Bind()
+                    $Msg = "LDAPS connection successful"
+                    Write-Verbose "[$Computer] $Msg"
+                    $Messages += $Msg
+                } 
+                Catch {
+                    $state = "Connection failed ($($_.Exception.InnerException.Message.Trim()))"
+                    $Msg = "LDAPS connection failed"
+                    Write-Warning "[$Computer] $Msg"
+                    $Messages += $Msg
+                }
+
+                <# Wintelrob's addition:
+                    Code to handle when the system cannot interpret the newer code '44550'
+                    to convert to the algorithm name. We just don't get the type name and
+                    convert the number to a string to combine with the name we think it 
+                    should be.
+                #>
+                If ([Int]$Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm -eq 44550){
+                    $KeyExchangeAlgo = [string]$Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm + ' (ECDH_Ephem)'
+                }
+                Else {
+                    If (-not ($KeyExchangeAlgo = [Security.Authentication.ExchangeAlgorithmType][Int]$Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm)) {
+                        $KeyExchangeAlgo = $Null
+                    }
+                }
+            }
+            Catch {
+                $Msg = "Failed to create delegate $($_.Exception.Message)"
+                Write-Warning "[$Computer] $Msg"
+                $Messages += $Msg
             }
         }
+        Catch {
+            $Msg = "Failed to create DirectoryServices object $($_.Exception.Message)"
+            Write-Warning "[$Computer] $Msg"
+            $Messages += $Msg
+        }
+
 
         [PSCustomObject]@{
             ComputerName         = $Computer
@@ -256,6 +252,7 @@ process {
             ExchangeStrength     = $Connection.SessionOptions.SslInformation.ExchangeStrength
             X509Certificate      = $Script:LdapCertificate
             PSTypeName           = 'Indented.LDAP.ConnectionInformation'
+            Messages             = $Messages          
         }
 
         Try {
@@ -263,19 +260,14 @@ process {
         }
         Catch {}
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    }
+    } #end foreach
 
-
+}
+End {
     
+    Write-Progress -Activity * -Completed
+    $Msg = "END: $Scriptname] $Activity" 
+    Write-Verbose $Msg
+
 }
-}
+} # End Test-PKLDAPSSLConnection

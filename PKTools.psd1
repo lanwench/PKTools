@@ -12,7 +12,7 @@
 RootModule = 'PKTools.psm1'
 
 # Version number of this module.
-ModuleVersion = '01.39.0000'
+ModuleVersion = '02.00.0000'
 
 # ID used to uniquely identify this module
 GUID = '3a49eaff-5e0f-41db-b149-3dc1f36968c1'
@@ -30,7 +30,7 @@ Copyright = '(c) 2022 Paula Kingsley. All rights reserved.'
 Description = 'Various PowerShell tools, functions, demos, stuff, things'
 
 # Minimum version of the Windows PowerShell engine required by this module
- PowerShellVersion = '3.0.0'
+ PowerShellVersion = '4.0.0'
 
 # Name of the Windows PowerShell host required by this module
 # PowerShellHostName = ''
@@ -66,16 +66,16 @@ Description = 'Various PowerShell tools, functions, demos, stuff, things'
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = '*'
+# FunctionsToExport = '*'
 
 # Cmdlets to export from this module
-CmdletsToExport = '*'
+# CmdletsToExport = '*'
 
 # Variables to export from this module
-VariablesToExport = '*'
+# VariablesToExport = '*'
 
 # Aliases to export from this module
-AliasesToExport = '*'
+# AliasesToExport = '*'
 
 # DSC resources to export from this module
 # DscResourcesToExport = @()
