@@ -10,7 +10,7 @@ Function Get-PKADUserDisabledDate {
     Returns a PSObject
 
 .NOTES
-    Name    : Get-PKADUserDisabledDate 
+    Name    : Function_Get-PKADUserDisabledDate.ps1
     Author  : Paula Kingsley
     Version : 01.00.0000
     History :
