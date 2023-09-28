@@ -6,9 +6,9 @@
 |**Name** |PKTools|
 |**Author** |Paula Kingsley|
 |**Type** |Script|
-|**Version** |2.4.0|
+|**Version** |2.5.0|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Wednesday, September 27, 2023 5:33:29 PM|
+|**Date**|README.md file generated on Thursday, September 28, 2023 11:27:37 AM|
 
 This module contains 19 PowerShell functions or commands
 

@@ -11,21 +11,25 @@ Function Get-PKDateTimeExamples {
     Name    : Function_Get-PKDateTimeExamples.ps1
     Created : 2023-09-27
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01.0000
     History :
 
         ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
         
         v01.00.0000 - 2023-09-27 - Created script because I can never remember these things!
+        v01.01.0000 - 2023-09-28 - Added parameter to hide description from output
 
 .LINK
     https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-date?view=powershell-7.3
 
 .PARAMETER Uformat
-Return UFormat/Unix types (default is standard)
+    Return UFormat/Unix types (default is standard)
+
+.PARAMETER HideDescription
+    Hide the description, displaying only command and example output
 
 .PARAMETER OutputType
-Return results as console output using table or list view, or Write-Host (if omitted, output is a PSObject)
+    Return results as console output using table or list view, or Write-Host (if omitted, output is a PSObject)
 
 .EXAMPLE
     PS C:\> Get-PKDateTimeExamples 
@@ -43,6 +47,10 @@ Return results as console output using table or list view, or Write-Host (if omi
     PS C:\> Get-PKDateTimeExamples -OutputType AsList
     Returns standard date/time formats to the console in list format
 
+.EXAMPLE
+    PS C:\> Get-PKDateTimeExamples -HideDescription -OutputType AsList
+    Returns standard date/time formats to the console in list format (commands and examples only)
+
 #>
     
     [CmdletBinding()]
@@ -51,6 +59,10 @@ Return results as console output using table or list view, or Write-Host (if omi
             HelpMessage = "Return UFormat/Unix types (default is standard)"
         )]    
         [switch]$Uformat,
+        [Parameter(
+            HelpMessage = "Hide the description, displaying only command and example output"
+        )]    
+        [switch]$HideDescription,
         [Parameter(
             HelpMessage = "Return results as console output using table or list view, or Write-Host (if omitted, output is a PSObject)"
         )]
@@ -105,7 +117,7 @@ Return results as console output using table or list view, or Write-Host (if omi
             Displays sortable format based on ISO 8601;`Get-Date -Format s`;Get-Date -Format s
             Displays long time format;`Get-Date -Format T`;Get-Date -Format T
             Displays short time format;`Get-Date -Format t`;Get-Date -Format t
-            Displays month, year;`Get-Date -Format y`;Get-Date -Format y" | ConvertFrom-CSV -Delimiter ";"
+            Displays month, year;`Get-Date -Format y`;Get-Date -Format y" | ConvertFrom-CSV -Delimiter ";" | Sort-Object Command
         }
     
         Else {
@@ -140,7 +152,8 @@ Return results as console output using table or list view, or Write-Host (if omi
             Displays the date (in standard format for locale);`Get-Date -Uformat %x`;Get-Date -Uformat %x
             Displays the year in 4-digit format;`Get-Date -Uformat %Y`;Get-Date -Uformat %Y
             Displays the year in 2-digit format;`Get-Date -Uformat %y`;Get-Date -Uformat %y
-            Displays the time zone offset from Universal Displays the time Coordinate (UTC);`Get-Date -Uformat %Z`;Get-Date -Uformat %Z"  | ConvertFrom-CSV -Delimiter ";"
+            Displays the time zone offset from Universal Displays the time Coordinate (UTC);`Get-Date -Uformat %Z`;Get-Date -Uformat %Z"  | 
+                ConvertFrom-CSV -Delimiter ";"  | Sort-Object Command
         }
 
         $Results = @()
@@ -152,7 +165,10 @@ Return results as console output using table or list view, or Write-Host (if omi
                 Example     = $(Invoke-Expression $Line.Command)
             }
         }
-    
+        
+        If ($HideDescription.IsPresent) {
+            $Results = $Results | Select-Object Command,Example
+        }
         Switch ($OutputType) {
             AsTable {
                 Write-Output $Results | Format-Table -AutoSize
