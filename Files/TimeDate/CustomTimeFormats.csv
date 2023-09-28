@@ -1,0 +1,44 @@
+Pattern1,Pattern2,Description
+d,%d,"The day of the month. Single-digit days do not have a leading zero ➞ 9. If the format pattern is not combined with other format patterns, just ""d"" alone, then the application will apply the standard ShortDate Pattern. ➞ 2023-03-29 (which will vary by culture/locale)"
+dd,,The day of the month. Single-digit days have a leading zero. ➞ 09
+ddd,,"The abbreviated name of the day of the week, (culture-specific string)."
+dddd,,"The full name of the day of the week, (culture-specific string)."
+f,%f,"The fraction of a second in single-digit precision: tenths of a second. The remaining digits are truncated. If the format pattern is not combined with other format patterns, just ""f"" alone, then the application will apply the standard Full date and time Pattern. ➞ 29 March 2023 18:40:22 (which will vary by culture/locale)"
+ff,,The fraction of a second in double-digit precision: hundredths of a second. The remaining digits are truncated.
+fff,,The fraction of a second in three-digit precision: milliseconds. The remaining digits are truncated.
+ffff,,The fraction of a second in four-digit precision: ten thousandths of a second. The remaining digits are truncated.
+fffff,,The fraction of a second in five-digit precision: hundred thousandths of a second. The remaining digits are truncated.
+ffffff,,The fraction of a second in six-digit precision: millionths of a second. The remaining digits are truncated.
+fffffff,,The fraction of a second in seven-digit precision: ten millionths of a second. The remaining digits are truncated.
+F,%F,"Displays the most significant digit of the seconds fraction: tenths of a second. Nothing is displayed if the digit is zero. If this format pattern is not combined with other format patterns, just ""F"" alone, then the application will apply the standard FullDateTime pattern. ➞ 29 March 2023 18:40:22 (which will vary by culture/locale)"
+FF,,"Displays the two most significant digits of the seconds fraction: hundredths of a second. However, trailing zeros, or two zero digits, are not displayed."
+FFF,,"Displays the three most significant digits of the seconds fraction: milliseconds. However, trailing zeros, or three zero digits, are not displayed."
+FFFF,,"Displays the four most significant digits of the seconds fraction: ten thousandths of a second. However, trailing zeros, or four zero digits, are not displayed."
+FFFFF,,"Displays the five most significant digits of the seconds fraction: hundred thousandths of a second. However, trailing zeros, or five zero digits, are not displayed."
+FFFFFF,,"Displays the six most significant digits of the seconds fraction: millionths of a second. However, trailing zeros, or six zero digits, are not displayed."
+FFFFFFF,,"Displays the seven most significant digits of the seconds fraction: ten millionths of a second. However, trailing zeros, or seven zero digits, are not displayed."
+gg,,The period or era. This pattern is ignored if the date to be formatted does not have an associated period or era string.
+h,%h,"The hour in a 12-hour clock. Single-digit hours do not have a leading zero. If this format pattern is not combined with other format patterns, just ""h"" alone, then the application will throw an error."
+hh,,The hour in a 12-hour clock. Single-digit hours have a leading zero. ➞ 02
+H,%H,"The hour in a 24-hour clock. Single-digit hours do not have a leading zero. If this format pattern is not combined with other format patterns, just ""H"" alone, then the application will throw an error."
+HH,,The hour in a 24-hour clock. Single-digit hours have a leading zero. ➞ 14
+K,,"Time zone offset from Universal Time Coordinate (UTC) ➞ +01:00. For a UTC time the result string includes a ""Z"" character to represent a UTC date. "
+m,%m,"The minute, from 0 through 59. Single-digit minutes do not have a leading zero. ➞ 40. If this format pattern is not combined with other format patterns, just ""m"" alone, then the application will apply the standard MonthDay Pattern ➞ 29 March (which will vary by culture/locale)"
+mm,,The minute. Single-digit minutes have a leading zero. ➞ 40
+M,%M,"The numeric month. Single-digit months do not have a leading zero. ➞ 3. If this format pattern is not combined with other format patterns, just ""M"" alone, then the application will apply the standard MonthDay Pattern ➞ 29 March (which will vary by culture/locale)"
+MM,,The numeric month. Single-digit months have a leading zero. ➞ 03
+MMM,,The abbreviated name of the month ➞ Mar
+MMMM,,The full name of the month ➞ March
+s,%s,"The second. Single-digit seconds do not have a leading zero. ➞ 22. If this format pattern is not combined with other format patterns, just ""s"" alone, then the application will apply the standard SortableDateTime Pattern ➞ 2023-03-29T18:40:22"
+ss,,The second. Single-digit seconds have a leading zero. ➞ 22
+t,%t,"The first character in the AM/PM designator, if any. ➞ P. If this format pattern is not combined with other format patterns, just ""t"" alone, then the application will apply the standard ShortTime Pattern ➞ 18:40"
+tt,,"The AM/PM designator (""ante meridiem"" (before noon) or ""post meridiem"" (after noon)), if any. Your application should use this format pattern for languages for which it is necessary to maintain the distinction between AM and PM. An example is Japanese, for which the AM and PM designators differ in the second character instead of the first character."
+y,%y,"The year without the century. If the year without the century is less than 10, the year is displayed with no leading zero. ➞ 23. If this format pattern is not combined with other format patterns, just ""y"" alone, then the application will apply the standard YearMonth pattern ➞ March 2023 (which will vary by culture/locale)"
+yy,,"The year without the century. If the year without the century is less than 10, the year is displayed with a leading zero."
+yyy,,"The year in three digits. If the year is less than 100, the year is displayed with a leading zero."
+yyyy,,"The year in four or five digits (depending on the calendar used), including the century. Pads with leading zeros to get four digits. Thai Buddhist and Korean calendars have five-digit years. Users selecting the ""yyyy"" pattern see all five digits without leading zeros for calendars that have five digits. Exception: the Japanese and Taiwan calendars always behave as if ""yy"" is selected."
+yyyyy,,"The year in five digits. Pads with leading zeros to get five digits. Exception: the Japanese and Taiwan calendars always behave as if ""yy"" is selected."
+yyyyyy,,"The year in six digits. Pads with leading zeros to get six digits. Exception: the Japanese and Taiwan calendars always behave as if ""yy"" is selected. The pattern can be continued with a longer string of ""y""s padding with more leading zeros."
+z,%z,"The time zone offset (""+"" or ""-"" followed by the hour only). Single-digit hours do not have a leading zero. For example, Pacific Standard Time is ""-8"".. If this format pattern is not combined with other format patterns, just ""z"" alone, then the application will throw an error."
+zz,,"The time zone offset (""+"" or ""-"" followed by the hour only). Single-digit hours have a leading zero. For example, Pacific Standard Time is ""-08""."
+zzz,,"The full time zone offset (""+"" or ""-"" followed by the hour and minutes). Single-digit hours and minutes have leading zeros. For example, Pacific Standard Time is ""-08:00""."

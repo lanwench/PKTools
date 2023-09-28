@@ -1,0 +1,16 @@
+Pattern1,Pattern2,Description
+d,,"ShortDate pattern; e.g. get-date -format ""d"" ➞ 2023-03-29 (this will vary by culture/locale)"
+D,,LongDate pattern ➞ 29 March 2023 (this will vary by culture/locale)
+f,,Full date and time (long date and short time) ➞ 29 March 2023 18:40 (this will vary by culture/locale)
+F,,FullDateTime pattern (long date and long time) ➞ 29 March 2023 18:40:22 (this will vary by culture/locale)
+g,,General (short date and short time) ➞ 2023-03-29 18:40 (this will vary by culture/locale)
+G,,General (short date and long time) ➞ 2023-03-29 18:40:22 (this will vary by culture/locale)
+m,M,MonthDay Pattern ➞ 29 March (this will vary by culture/locale)
+o,O,"Round-trip date/time pattern; with this format pattern, the formatting or parsing operation always uses the invariant culture. ➞ 2023-03-29T18:40:22.6658990+01:00"
+r,R,"RFC1123 pattern; with this format pattern, the formatting or parsing operation always uses the invariant culture. ➞ Wed, 29 Mar 2023 18:40:22 GMT"
+s,,"SortableDateTime pattern (based on ISO 8601) using local time; with this format pattern, the formatting or parsing operation always uses the invariant culture. ➞ 2023-03-29T18:40:22"
+t,,ShortTime Pattern ➞ 18:40 (this will vary by culture/locale)
+T,,LongTime Pattern ➞ 18:40:22 (this will vary by culture/locale)
+u,,"UniversalSortableDateTime pattern using the format for universal time display; with this format pattern, the formatting or parsing operation always uses the invariant culture.➞ 2023-03-29 18:40:22"
+U,,Full date and time (long date and long time) using universal time.➞ 29 March 2023 17:40:22 (this will vary by culture/locale)
+y,Y,YearMonth pattern ➞ March 2023 (this will vary by culture/locale)
