@@ -1,6 +1,6 @@
 ﻿#requires -version 4
-Function Resolve-PKDNS {
-<#
+Function Resolve-PKDNSName {
+    <#
 .SYNOPSIS 
     Performs forward and reverse lookups of one or more names or IP addresses, optionally testing for forward/reverse name match
 
@@ -12,14 +12,15 @@ Function Resolve-PKDNS {
     Returns a PSObject
 
 .NOTES
-    Name    : Function_Resolve-PKDNS.ps1
+    Name    : Function_Resolve-PKDNSName.ps1
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01.0000
     History :
     
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
         v01.00.0000 - 2023-03-08 - Created script
+        v01.01.0000 - 2023-10-16 - Renamed from Resolve-PKDNS and fixed issue with default name
 
 .PARAMETER Name
     Name or IP address to look up (currently only A/AAA, CNAME, PTR supported; default is local computername)
@@ -195,259 +196,253 @@ Function Resolve-PKDNS {
         VERBOSE: [END: Resolve-PKDNS]
 
 #>
-[cmdletbinding(DefaultParameterSetName = "Default")]
-Param(
-    [Parameter(
-        ValueFromPipeline,
-        Position=0,
-        HelpMessage = "Name or IP address to look up (currently only A/AAA, CNAME, PTR supported; default is local computername)"
-    )]
-    [string[]]$Name,
+    [cmdletbinding(DefaultParameterSetName = "Default")]
+    Param(
+        [Parameter(
+            ValueFromPipeline,
+            Position = 0,
+            HelpMessage = "Name or IP address to look up (currently only A/AAA, CNAME, PTR supported; default is local computername)"
+        )]
+        [string[]]$Name = $Env:COMPUTERNAME,
 
-    [Parameter(
-        ParameterSetName = "Match",
-        HelpMessage = "Returns a TRUE/FALSE based on the forward & reverse lookup match"
-    )]
-    [switch]$MatchName,
+        [Parameter(
+            ParameterSetName = "Match",
+            HelpMessage = "Returns a TRUE/FALSE based on the forward & reverse lookup match"
+        )]
+        [switch]$MatchName,
 
-    [Parameter(
-        HelpMessage = "Returns additional output properties"
-    )]
-    [switch]$Detailed,
+        [Parameter(
+            HelpMessage = "Returns additional output properties"
+        )]
+        [switch]$Detailed,
 
-    [Parameter(
-        HelpMessage = "Nameserver (unless specified, uses default locally configured nameserver)"
-    )]
-    [string]$Server
-)
-Begin {
+        [Parameter(
+            HelpMessage = "Nameserver (unless specified, uses default locally configured nameserver)"
+        )]
+        [string]$Server
+    )
+    Begin {
 
-    # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+        # Current version (please keep up to date from comment block)
+        [version]$Version = "01.01.0000"
 
-    # How did we get here?
-    [switch]$PipelineInput = $MyInvocation.ExpectingInput
-    $Source = $PSCmdlet.ParameterSetName
-    $CurrentParams = $PSBoundParameters
+        # How did we get here?
+        [switch]$PipelineInput = $MyInvocation.ExpectingInput
+        $Source = $PSCmdlet.ParameterSetName
+        $CurrentParams = $PSBoundParameters
 
-    If (-not $CurrentParams.Name -and -not $PipelineInput.IsPresent) {
-        # Let's not be lazy; try to get the FQDN of the local computer so we aren't relying on search domains
-        $Name = (Get-WmiObject -Class Win32_ComputerSystem -PipelineVariable CS -ErrorAction SilentlyContinue | 
-            Select-Object @{N="Name";E={
-                    If ($CS.Domain) {"$($CS.DNSHostName).$($CS.Domain)"}
-                    Else {$Env:ComputerName}
-                }
-            }).Name
-        $CurrentParams.Name = $Name
-    }
+        <#
+        If (-not $CurrentParams.Name -and -not $PipelineInput.IsPresent) {
+            $Msg = "Getting local computer name or FQDN"
+            Write-Verbose "[Prerequisites] $Msg"
+            # Let's not be lazy; try to get the FQDN of the local computer so we aren't relying on search domains
+            $Name = (Get-WmiObject -Class Win32_ComputerSystem -PipelineVariable CS -ErrorAction SilentlyContinue | 
+                Select-Object @{N = "Name"; E = {
+                        If ($CS.Domain) { "$($CS.DNSHostName).$($CS.Domain)" }
+                        Else { $Env:ComputerName }
+                    }
+                }).Name
+            $CurrentParams.Name = $Name
+        }
+        #>
 
-    $ScriptName = $MyInvocation.MyCommand.Name
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path Variable:$_}| Foreach {
+        #If ($PipelineInput.IsPresent) {$CurrentParams.Name = $Null}
+
+        $ScriptName = $MyInvocation.MyCommand.Name
+        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
+        Where-Object { Test-Path Variable:$_ } | Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-    $CurrentParams.Add("ScriptName",$ScriptName)
-    $CurrentParams.Add("ScriptVersion",$Version)
-    $CurrentParams.Add("PipelineInput",$PipelineInput)
-    $CurrentParams.Add("ParameterSetName",$Source)
-    Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
+        $CurrentParams.Add("ScriptName", $ScriptName)
+        $CurrentParams.Add("ScriptVersion", $Version)
+        $CurrentParams.Add("PipelineInput", $PipelineInput)
+        $CurrentParams.Add("ParameterSetName", $Source)
+        Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
     
-    $Param=@{
-        ErrorAction = "Stop"
-        Verbose = $False
-    }
-    If ($Server) {
-        $Param.Add("Server",$Server)
-    }
+        $Param = @{
+            ErrorAction = "Stop"
+            Verbose     = $False
+        }
+        If ($CurrentParams.Server) {$Param.Add("Server", $Server)}
 
-    If ($MatchName.IsPresent) {
-        $Select = "Lookup,RecordType,Section,Name,TTL,NameHost,IPAddress,MatchResults,IsMatch,Messages" -split(",")
-        If (-not $Detailed.IsPresent) {$Select = $Select | Where-Object {$_ -notin @("Section,TTL,MatchResults,Messages" -split(","))}}
-    }
-    Else {
-        $Select = "Lookup,RecordType,Section,Name,TTL,NameHost,IPAddress,Messages" -split(",")
-        If (-not $Detailed.IsPresent) {$Select = $Select | Where-Object {$_ -notin @("Section,TTL,Messages" -split(","))}}
-    }
+        If ($MatchName.IsPresent) {
+            $Select = "Lookup,RecordType,Section,Name,TTL,NameHost,IPAddress,MatchResults,IsMatch,Messages" -split (",")
+            If (-not $Detailed.IsPresent) { $Select = $Select | Where-Object { $_ -notin @("Section,TTL,MatchResults,Messages" -split (",")) } }
+        }
+        Else {
+            $Select = "Lookup,RecordType,Section,Name,TTL,NameHost,IPAddress,Messages" -split (",")
+            If (-not $Detailed.IsPresent) { $Select = $Select | Where-Object { $_ -notin @("Section,TTL,Messages" -split (",")) } }
+        }
 
-    # Not currently in use
-    #Function PTRtoIP($PTR) {
-    #    # Thanks, Boe Prox
-    #    $T = ($PTR -replace '.in-addr.arpa$').split(".")
-    #    $T[-1..-($T.Count)] -join '.'
-    #}
+        # Not currently in use
+        #Function PTRtoIP($PTR) {
+        #    # Thanks, Boe Prox
+        #    $T = ($PTR -replace '.in-addr.arpa$').split(".")
+        #    $T[-1..-($T.Count)] -join '.'
+        #}
 
     
-    $Activity = "Perform forward/reverse DNS lookups"
-    If ($CurrentParams.Server) {$Activity += " against nameserver '$Server'"}
-    Else {$Activity += " against default nameserver(s)"}
-    If ($MatchName.IsPresent) {$Activity += ", testing for forward/reverse match"}
-    Write-Verbose "[BEGIN: $ScriptName] $Activity"
+        $Activity = "Perform forward/reverse DNS lookups"
+        If ($CurrentParams.Server) { $Activity += " against nameserver '$Server'" }
+        Else { $Activity += " against default nameserver(s)" }
+        If ($MatchName.IsPresent) { $Activity += ", testing for forward/reverse match" }
+        Write-Verbose "[BEGIN: $ScriptName] $Activity"
 
-}
-Process {
+    }
+    Process {
     
-    $Total = $Name.Count
-    $Current = 0
+        $Total = $Name.Count
+        $Current = 0
 
-    Foreach ($Target in $Name) {
+        Foreach ($Target in $Name) {
         
-        $Current ++
-        If ((-not $Target -as [ipaddress]) -and (-not $Target -match "\.")) {
-            $Msg = "Hostnames or single-label domains may return errors"
-            Write-Warning "[$Target] $Msg"
-        } 
-        $Msg = "Performing lookup"
-        Write-Verbose "[$Target] $Msg"
-        Write-Progress -Activity $Activity -Status $Target -CurrentOperation $Msg -PercentComplete ($Current/$Total*100)
+            $Current ++
+            If ((-not $Target -as [ipaddress]) -and (-not $Target -match "\.")) {
+                $Msg = "Hostnames or single-label domains may return errors"
+                Write-Warning "[$Target] $Msg"
+            } 
+            [string]$Msg = "Performing lookup"
+            # Write-Verbose "[$Target] $Msg"
+            Write-Progress -ID 1 -Activity $Activity -CurrentOperation $Target -PercentComplete ($Current / $Total * 100)
         
-        Try {
-            [object[]]$Results = Resolve-DNSName -Name $Target @Param
-            $Output = @()
-            $Msg = "$($Results.Count) result(s) found"
-            Write-Verbose "[$Target] $Msg"
-            Foreach ($Result in $Results){
-            
-                $IsMatch = "-"
-                $Msg = "Operation completed successfully"
+            Try {
+                [object[]]$Results = Resolve-DNSName -Name $Target @Param
+                $Output = @()
+                $Msg = "$($Results.Count) result(s) found"
+                Write-Verbose "[$Target] $Msg"
+                Foreach ($Result in $Results) {
+                    
+                    $Messages = @()
+                    $Msg = "Forward lookup completed successfully"
+                    $Messages += $Msg
 
-                Switch ($Result.type)  {
-                    {$_ -in 'A','AAAA'} {
-                        
-                        If ($MatchName.IsPresent) {
-                            $Msg = "Testing forward/reverse match for IP address '$($Result.IPAddress)'"
-                            Write-Verbose "[$Target] $Msg"
-                            Write-Progress -Activity $Activity -Status $Target -CurrentOperation $Msg -PercentComplete ($Current/$Total*100)
-                            If ($CheckMatch = Resolve-PKDNS -Name $Result.IPAddress @Param) {
-                                If ($CheckMatch.NameHost -contains $Target) {
-                                    $IsMatch = $True
-                                    $Msg = "Forward/reverse match; reverse lookup on resolved IP address '$($Result.IPAddress)' returns: $($CheckMatch.Namehost -join(", "))"
-                                    Write-Verbose "[$Target] $Msg"
+                    Switch ($Result.type) {
+                        { $_ -in 'A', 'AAAA' } {
+                            
+                            #$Msg = "Forward lookup completed successfully"
+                            #$Messages += $Msg
+
+                            If ($MatchName.IsPresent) {
+                                $Activity = "Testing forward/reverse match for IP address" # $($Result.IPAddress)"
+                                #Write-Verbose "[$Target] $Msg"
+                                Write-Progress -id 2 -Activity $Activity -CurrentOperation $($Result.IPAddress) # -PercentComplete ($Current / $Total * 100)
+                                If ($CheckMatch = Resolve-PKDNSName -Name $Result.IPAddress @Param) {
+                                    $MatchResults = $CheckMatch.NameHost
+                                    If ($MatchResults -contains $Target) {
+                                        $IsMatch = $True
+                                        $Msg = "Forward/reverse lookup results match; IP address '$($Result.IPAddress)' resolves to $($MatchResults -join(", "))"
+                                        $Messages += $Msg
+                                    }
+                                    Else {
+                                        $IsMatch = $False
+                                        $Msg = "Forward/reverse lookup results don't match; IP address '$($Result.IPAddress)' returns: $($MatchResults -join(", "))"
+                                        $Messages += $Msg
+                                    }
                                 }
                                 Else {
-                                    $IsMatch = $False
-                                    $Msg = "Forward/reverse mismatch; reverse lookup on resolved IP address '$($Result.IPAddress)' returns: $($CheckMatch.Namehost -join(", "))"
-                                    Write-Warning "[$Target] $Msg"
+                                    $IsMatch = "ERROR"
+                                    $Msg = "Reverse lookup on resolved IP address failed"
+                                    $Messages += $Msg
                                 }
+                                Write-Verbose "[$Target] $Msg"
                             }
-                            Else {
-                                $IsMatch = "ERROR"
-                                $Msg = "Reverse lookup on resolved IP address failed"
+                            $Output += [PSCustomObject]@{
+                                Lookup       = $Target
+                                RecordType   = $Result.Type
+                                Section      = $Result.Section
+                                TTL          = $Result.TTL
+                                Name         = $Result.Name
+                                NameHost     = "-"
+                                IPAddress    = $Result.IPAddress
+                                MatchResults = $MatchResults            
+                                IsMatch      = $IsMatch
+                                Messages     = $Messages -join("`n")
+                            }
+                        }
+                        CNAME {
+                            If ($MatchName.IsPresent) {
+                                $Msg = "No forward/reverse match possible on CNAME records"
+                                $Messages += $Msg
+                            }
+                            $Output += [PSCustomObject]@{
+                                Lookup       = $Target
+                                RecordType   = $Result.Type
+                                TTL          = $Result.TTL
+                                Name         = $Result.Name
+                                NameHost     = $Result.NameHost
+                                IPAddress    = "-"
+                                MatchResults = "-"
+                                IsMatch      = "-"
+                                Messages     = $Messages -join("`n")
+                            }
+                        }
+                        PTR {
+                            If ($MatchName.IsPresent) {
+                                $Activity = "Testing forward/reverse match for resolved namehost '$($Result.Namehost)'"
+                                Write-Progress -id 2 -Activity $Activity -CurrentOperation $Target
+                                If ($CheckMatch = Resolve-PKDNSName -Name $Result.Namehost @Param) {
+                                    $MatchResults = $CheckMatch.Name
+                                    If ($CheckMatch | Where-Object { $_.IPAddress -eq $Target }) {
+                                        $IsMatch = $True
+                                        $Msg = "Forward/reverse results match; namehost '$($Result.Namehost)' resolves to $($CheckMatch.IPAddress | Where-Object {$_ -eq $Target})"
+                                        $Messages += $Msg
+                                    }
+                                    Else {
+                                        $IsMatch = $False
+                                        $Msg = "Forward/reverse results don't match; namehost '$($Result.Namehost)' resolves to $($CheckMatch.IPAddress -join(", "))"
+                                        $Messages += $Msg
+                                    }
+                                }
+                                Else {
+                                    $IsMatch = "ERROR"
+                                    $Msg = "Forward lookup on resolved namehost failed"
+                                    $Messages += $Msg
+                                    
+                                }
+                                Write-Verbose "[$Target] $Msg"
+                            }
+                            $Output += [PSCustomObject]@{
+                                Lookup       = $Target
+                                RecordType   = $Result.Type
+                                TTL          = $Result.TTL
+                                Section      = $Result.Section
+                                Name         = $Result.Name
+                                NameHost     = $Result.NameHost
+                                IPAddress    = "-"
+                                MatchResults = $MatchResults
+                                IsMatch      = $IsMatch 
+                                Messages     = $Messages -join("`n")
+                            }
+                        }
+                        Default {
+                            If ($MatchName.IsPresent) { 
+                                $Msg = "Skipping $($Result.Type) record; -MatchName currently supports only A, AA, CNAME, and PTR" 
                                 Write-Warning "[$Target] $Msg"
                             }
                         }
-                        $Output += [PSCustomObject]@{
-                            Lookup       = $Target
-                            RecordType   = $Result.Type
-                            Section      = $Result.Section
-                            TTL          = $Result.TTL
-                            Name         = $Result.Name
-                            NameHost     = "-"
-                            IPAddress    = $Result.IPAddress
-                            MatchResults = $CheckMatch.NameHost            
-                            IsMatch      = $IsMatch
-                            Messages     = $Msg
-                        }
-                    }
-                    CNAME  {
-                        $Output += [PSCustomObject]@{
-                            Lookup       = $Target
-                            RecordType   = $Result.Type
-                            TTL          = $Result.TTL
-                            Name         = $Result.Name
-                            NameHost     = $Result.NameHost
-                            IPAddress    = "-"
-                            MatchResults = "-"
-                            IsMatch      = "-"
-                            Messages     = $Msg
-                        }
-                    }
-                    PTR {
-                        If ($MatchName.IsPresent) {
-                            $Msg = "Testing forward/reverse match for resolved namehost '$($Result.Namehost)'"
-                            Write-Verbose "[$Target] $Msg"
-                            Write-Progress -Activity $Activity -Status $Target -CurrentOperation $Msg -PercentComplete ($Current/$Total*100)
-                            If ($CheckMatch = Resolve-PKDNS -Name $Result.Namehost @Param) {
-                                If ($CheckMatch | Where-Object {$_.IPAddress -eq $Target}) {
-                                    $IsMatch = $True
-                                    $Msg = "Forward/reverse match; forward lookup on resolved namehost '$($Result.Namehost)' equals or includes: $($CheckMatch.IPAddress| Where-Object {$_ -eq $Target})"
-                                    Write-Verbose "[$Target] $Msg"
-                                }
-                                Else {
-                                    $IsMatch = $False
-                                    $Msg = "Forward/reverse mismatch; forward lookup on resolved namehost '$($Result.Namehost)' returns: $($CheckMatch.IPAddress -join(", "))"
-                                    Write-Warning "[$Target] $Msg"
-                                }
-                            }
-                            Else {
-                                $IsMatch = "ERROR"
-                                $Msg = "Forward lookup on resolved namehost failed"
-                                Write-Warning "[$Target] $Msg"
-                            }
-                        }
-                        $Output += [PSCustomObject]@{
-                            Lookup       = $Target
-                            RecordType   = $Result.Type
-                            TTL          = $Result.TTL
-                            Section      = $Result.Section
-                            Name         = $Result.Name
-                            NameHost     = $Result.NameHost
-                            IPAddress    = "-"
-                            MatchResults = $CheckMatch.IPAddress
-                            IsMatch      = $IsMatch
-                            Messages     = $Msg
-                        }
-                    }
-                    SOA {
-                        If ($MatchName.IsPresent) {Write-Warning "[$Target] -MatchName currently supports only A, AA, CNAME, and PTR"}
-                        $Output += [PSCustomObject]@{
-                            Lookup       = $Target
-                            RecordType   = $Result.Type
-                            Section      = $Result.Section
-                            Name         = $Result.PrimaryServer
-                            TTL          = $Result.TTL
-                            NameHost     = "-"
-                            IPAddress    = "-"
-                            MatchResults = "-"
-                            IsMatch      = "-"
-                            Messages     = [PSCustomObject]@{NameAdministrator=$Result.NameAdministrator;SerialNumber=$Result.SerialNumber}
-                        }
-                    }
-                    Default {
-                        If ($MatchName.IsPresent) {Write-Warning "[$Target] -MatchName currently supports only A, AA, CNAME, and PTR"}
-                        $Output += [PSCustomObject]@{
-                            Lookup       = $Target
-                            RecordType   = $Result.Type
-                            Section      = $Result.Section
-                            Name         = "-"
-                            TTL          = $Result.TTL
-                            NameHost     = "-"
-                            IPAddress    = "-"
-                            MatchResults = "-"
-                            IsMatch      = "-"
-                            Messages     = $Result
-                        }
-                    }
-                } #end switch  
-            } #end foreach result
+                    } #end switch  
+                } #end foreach result
 
-            Write-Output $Output | Select-Object $Select
-        }
-        Catch {
-            $Msg = $_.Exception.Message
-            Write-Warning "[$Target] $Msg"
-            $Output = "" | Select-Object $Select
-            $Output.Lookup = $Target
-            If ($Detailed.IsPresent) {$Output.Messages = $Msg}
-            $Output.PSObject.Properties.Name | Foreach-Object {If ($Output.$_ -eq $Null) {$Output.$_ = "ERROR"}}
-            Write-Output $Output | Select-Object $Select
-        }
-    } #end foreach name
+                Write-Output $Output | Select-Object $Select
+            }
+            Catch {
+                $Msg = $_.Exception.Message
+                Write-Warning "[$Target] $Msg"
+                $Output = "" | Select-Object $Select
+                $Output.Lookup = $Target
+                If ($Detailed.IsPresent) { $Output.Messages = $Msg }
+                $Output.PSObject.Properties.Name | Foreach-Object { If ($Null = $Output.$_) { $Output.$_ = "ERROR" } }
+                Write-Output $Output | Select-Object $Select
+            }
+        } #end foreach name
 
-}
-End {
-    Write-Progress * -Completed
-    Write-Verbose "[END: $ScriptName]"
-}
-} #end Resolve-PKDNS
+    }
+    End {
+        Write-Progress * -Completed
+        Write-Verbose "[END: $ScriptName]"
+    }
+} #end Resolve-PKDNSName
+
+$Null = New-Alias -Name Resolve-PKDNS -Value Resolve-PKDNSName -Force -ErrorAction SilentlyContinue
 
 
