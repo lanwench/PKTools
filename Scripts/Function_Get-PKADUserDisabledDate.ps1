@@ -108,7 +108,6 @@ Param(
 )
 Begin{
     
-     
     # Current version (please keep up to date from comment block)
     [version]$Version = "01.00.0000"
 
@@ -118,8 +117,8 @@ Begin{
 
     $CurrentParams = $PSBoundParameters
     $ScriptName = $MyInvocation.MyCommand.Name
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path Variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} | 
+        Where-Object {Test-Path Variable:$_}| Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
     $CurrentParams.Add("ScriptName",$ScriptName)
@@ -151,18 +150,6 @@ Begin{
     Else {
         $DC = $Server
         $Params.Add("Server",$DC)
-        <#
-        $Msg = "Verifying domain controller"
-        Write-Verbose "[Prerequisites] $Msg"
-        Write-Progress -Activity "Prerequisites" -CurrentOperation $Msg 
-        Try {
-            $DC = (Get-ADDomainController -Identity $Server -Server $Server @Params).Hostname
-            $Params.Add("Server",$DC)
-        }
-        Catch {
-            Throw $_.Exception.Message
-        }
-        #>
     }
 
     If ($Detailed.IsPresent) {
@@ -172,10 +159,9 @@ Begin{
         $Select = "FullName,Enabled,WhenDisabled,SAMAccountName,Mail,DistinguishedName" -split(",")
     }
 
-
     $Props = "GivenName,Surname,WhenChanged,Mail,Name,Manager,Description,WhenCreated,CanonicalName" -split(",")
-
     $Activity = "Report date user objects were disabled in Active Directory"
+    Write-Verbose "[BEGIN: $ScriptName] $Activity"
 }
 Process {
     
@@ -261,23 +247,8 @@ Process {
 
     
     }
-    <#
-
-    $Members = Get-Aduser -Searchbase "DC=nlsn,DC=media" -SearchScope Subtree -filter "Enabled -eq '$False'"  -Server daynlsndc-1.nlsn.media -Properties WhenChanged,Mail,Name,Manager,Description,WhenCreated,CanonicalName -PipelineVariable User | 
-    Get-ADReplicationAttributeMetadata -Server daynlsndc-1.nlsn.media -Properties UserAccountControl  | 
-        Select-Object @{N="Name";E={$User.Name}},
-        @{N="Enabled";E={$User.Enabled}},
-        @{N="SAMAccountName";E={$User.SAMAccountName}},
-        @{N="Mail";E={$User.Mail}},
-        @{N="Description";E={$User.Description}},
-        @{N="Manager";E={$User.Manager}},
-        @{N="WhenChanged";E={$User.WhenChanged}},
-        @{N="WhenDisabled";E={$User.LastOriginatingChangeTime}},
-        @{N="CanonicalName";E={$User.CanonicalName}},
-        @{N="DistinguishedName";E={$User.DistinguishedName}}
-
-
-        #>
 }
-}
+End {}
+} # end Get-PKADUserDisabledDate
+
 
