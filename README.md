@@ -6,11 +6,11 @@
 |**Name** |PKTools|
 |**Author** |Paula Kingsley|
 |**Type** |Script|
-|**Version** |2.7.0|
+|**Version** |2.8.0|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Monday, February 5, 2024 4:18:17 PM|
+|**Date**|README.md file generated on Monday, February 12, 2024 4:46:37 PM|
 
-This module contains 20 PowerShell functions or commands
+This module contains 21 PowerShell functions or commands
 
 All functions should have reasonably detailed comment-based help, accessible via Get-Help ... e.g., 
   * `Get-Help Do-Something`
@@ -47,6 +47,7 @@ _Changelogs are generally found within individual functions, not per module._
 |**Get-PKADUserDisabledDate**|01.00.0000|Uses Get-ADUser and Get-ADReplicationAttributeMetadata to return the date user objects were disabled|
 |**Get-PKDateTimeExamples**|01.00.0000|Returns standard or unix format date/time formatting options with examples and descriptions|
 |**Get-PKSID**|01.00.0000|Gets the SID for one or more local or domain users or groups via .NET|
+|**Get-PKTaniumClient**|01.02.0000|Gets the Tanium Client service and registry configuration from one or more computers, using Get-WMIObject for downlevel compatibility|
 |**Get-PKTempPassword**|01.00.0000|Generates a custom-length password using alphanumeric/special characters or combo thereof, <br/>with option to avoid ambiguous characters|
 |**New-PKCodeSigningCert**|01.01.0000|Creates a new self-signed certificate on the local computer in the current user's certificate store|
 |**New-PKRandomPassword**|01.00.0000|Generates a random password string, with option to select length|
