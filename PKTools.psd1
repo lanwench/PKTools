@@ -12,7 +12,7 @@
 RootModule = 'PKTools.psm1'
 
 # Version number of this module.
-ModuleVersion = '02.12.0000'
+ModuleVersion = '02.13.0000'
 
 # ID used to uniquely identify this module
 GUID = '3a49eaff-5e0f-41db-b149-3dc1f36968c1'
@@ -66,28 +66,7 @@ Description = 'Various PowerShell tools, functions, demos, stuff, things'
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = 'Backup-PKChromeProfile',
-'Convert-PKBytesToSize',
-'Convert-PKEXchangeSMTPLog',
-'Convert-PKIISLog',
-'ConvertTo-PKCSV',
-'ConvertTo-PKRegex',
-'Format-PKBytes','Get-PKADUserDisabledDate',
-'Get-PKDateTimeExamples',
-'Get-PKGPResult',
-'Get-PKSID',
-'Get-PKTaniumClient',
-'New-PKCodeSigningCert',
-'New-PKComplexPassword',
-'New-PKFakeIdentity',
-'New-PKPassphrase',
-'Open-PKChrome',
-'Remove-PKAttributeBit',
-'Remove-PKMcAfee',
-'Resolve-PKDNSName',
-'Restore-PKISESession',
-'Save-PKISESession',
-'Test-PKLdapSSLConnection'
+# FunctionsToExport = '*'
 
 
 # Cmdlets to export from this module

@@ -6,11 +6,11 @@
 |**Name** |PKTools|
 |**Author** |Paula Kingsley|
 |**Type** |Script|
-|**Version** |2.12.0|
+|**Version** |2.13.0|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Tuesday, April 16, 2024 6:56:42 PM|
+|**Date**|README.md file generated on Wednesday, April 17, 2024 7:09:29 PM|
 
-This module contains 23 PowerShell functions or commands
+This module contains 24 PowerShell functions or commands
 
 All functions should have reasonably detailed comment-based help, accessible via Get-Help ... e.g., 
   * `Get-Help Do-Something`
@@ -49,6 +49,7 @@ _Changelogs are generally found within individual functions, not per module._
 |**Get-PKGPResult**|01.00.0000|Executes gpresult to an HTML or XML file, with the option to modify html font name/size and launch the file with the associated handler|
 |**Get-PKSID**|01.00.0000|Gets the SID for one or more local or domain users or groups via .NET|
 |**Get-PKTaniumClient**|01.02.0000|Gets the Tanium Client service and registry configuration from one or more computers, using Get-WMIObject for downlevel compatibility|
+|**Install-PKVSCodePortable**|-|Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself!|
 |**New-PKCodeSigningCert**|01.01.0000|Creates a new self-signed certificate on the local computer in the current user's certificate store|
 |**New-PKComplexPassword**|01.00.0000|Uses Get-Random and defined character sets to generate a password between 10 and 265 characters, with option to return secure string or plain text|
 |**New-PKFakeIdentity**|01.00.0000|Generates one or more random identities using Invoke-WebRequest and API call to publicapis.io, with option to return only basic details|
