@@ -6,11 +6,11 @@
 |**Name** |PKTools|
 |**Author** |Paula Kingsley|
 |**Type** |Script|
-|**Version** |2.13.0|
+|**Version** |2.14.0|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Wednesday, April 17, 2024 7:09:29 PM|
+|**Date**|README.md file generated on Tuesday, April 23, 2024 5:45:52 PM|
 
-This module contains 24 PowerShell functions or commands
+This module contains 25 PowerShell functions or commands
 
 All functions should have reasonably detailed comment-based help, accessible via Get-Help ... e.g., 
   * `Get-Help Do-Something`
@@ -47,6 +47,7 @@ _Changelogs are generally found within individual functions, not per module._
 |**Get-PKADUserDisabledDate**|01.00.0000|Uses Get-ADUser and Get-ADReplicationAttributeMetadata to return the date user objects were disabled|
 |**Get-PKDateTimeExamples**|01.00.0000|Returns standard or unix format date/time formatting options with examples and descriptions|
 |**Get-PKGPResult**|01.00.0000|Executes gpresult to an HTML or XML file, with the option to modify html font name/size and launch the file with the associated handler|
+|**Get-PKJOTD**|01.00.0000|Retrieves jokes from the v2.jokeapi.dev API based on specified parameters|
 |**Get-PKSID**|01.00.0000|Gets the SID for one or more local or domain users or groups via .NET|
 |**Get-PKTaniumClient**|01.02.0000|Gets the Tanium Client service and registry configuration from one or more computers, using Get-WMIObject for downlevel compatibility|
 |**Install-PKVSCodePortable**|-|Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself!|
