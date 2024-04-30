@@ -11,7 +11,7 @@ function New-PKComplexPassword {
     
 .NOTES        
     Name    : Function_New-PKComplexPassword.ps1
-    Created : 2024-02-12
+    Created : 2024-03-12
     Author  : Paula Kingsley
     Version : 01.00.1000
     History :
