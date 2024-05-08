@@ -1,7 +1,6 @@
 ﻿#requires -Version 3
 Function Remove-PKAttributeBit {
 <#
-
 .SYNOPSIS
     Removes one or more filesystem attribute bits from one or more files or folders (recursive)
 
@@ -203,12 +202,12 @@ Begin {
     [version]$Version = "01.00.0000"
 
     # Show our settings
-    $Source = $PSCmdlet.ParameterSetName
+    #$Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     
     $CurrentParams = $PSBoundParameters
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path variable:$_}| ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
     $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
