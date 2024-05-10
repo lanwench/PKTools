@@ -6,11 +6,11 @@
 |**Name** |PKTools|
 |**Author** |Paula Kingsley|
 |**Type** |Script|
-|**Version** |2.16.0|
+|**Version** |2.17.0|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Wednesday, May 8, 2024 4:11:19 PM|
+|**Date**|README.md file generated on Thursday, May 9, 2024 6:26:35 PM|
 
-This module contains 27 PowerShell functions or commands
+This module contains 28 PowerShell functions or commands
 
 All functions should have reasonably detailed comment-based help, accessible via Get-Help ... e.g., 
   * `Get-Help Do-Something`
@@ -64,3 +64,4 @@ _Changelogs are generally found within individual functions, not per module._
 |**Restore-PKISESession**|03.00.0000|Restores tabs/files from text file created using Save-PKISESession|
 |**Save-PKISESession**|03.00.0000|Saves open tabs in current ISE session to a file|
 |**Test-PKLdapSSLConnection**|01.01.0000|Tests an LDAPS connection, returning information about the negotiated SSL connection including the server certificate.|
+|**Update-PKADDisabledObjDescription**|01.00.0000|Updates the description field of disabled Active Directory objects with the object's disabled and last logon dates.|
