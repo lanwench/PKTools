@@ -5,22 +5,26 @@ Function Install-PKVSCodePortable {
     Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself! 
 
 .DESCRIPTION
-    Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself! 
-    First validates target path, then downloads and installs the latest version of VSCode Portable from the URI specified in the script if a newer version is available.
-    -Force parameter will download/overwrite even if current version is the latest
+    Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself
+    Skips existing /Data folder and code.lnk shortcut file in the target directory if present
+    Won't run inside Visual Studio Code
+    First validates target path, then downloads and installs the latest version of VSCode Portable from the URI specified in the script if a newer version is available
+    -ForceUpdate parameter will download/overwrite even if current version is the latest; -KillRunningProcess will stop any running VSCode Portable process in the specified path (requires elevation).
     Supports ShouldProcess
-    Writes to a log file
+    Writes to a log file in the target directory for tracking
 
 .NOTES
     Name    : Function_Install-PKVSCodePortable.ps1
     Created : 2024-04-17
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.02.0000
     History :
     
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
         v01.00.0000 - 2024-04-17 - Created script
+        v01.01.0000 - 2024-07-22 - Updates and fixes
+        v01.02.0000 - 2024-10-25 - Fixed error in continue
 
 .LINK
     https://stackoverflow.com/questions/25125818/powershell-invoke-webrequest-how-to-automatically-use-original-file-name
@@ -32,17 +36,20 @@ Function Install-PKVSCodePortable {
     Target folder for VSCode Portable (default is $Home\VSCode)
 
 .PARAMETER URI
-    URI for VSCode zip file download; change at your peril!
+    URI for portable VSCode zip file download; change at your peril!
 
-.PARAMETER Force
-    Force download and update even if current version matches new version
+.PARAMETER ForceUpdate
+    Update current installation even if no newer version was found
+
+.PARAMETER KillRunningProcess
+    Stop any running VSCode Portable process in the specified path (requires elevation)
 
 .EXAMPLE 
-    Install-PKVSCodePortable -Verbose
+    PS C:\> Install-PKVSCodePortable -Verbose
     Downloads and installs or updates VSCode Portable in C:\VSCode
 
 .EXAMPLE 
-    PS C:\> Install-PKVSCodePortable -TargetPath "C:\MyPath" -URI "https://this.seemslike.adodgypath.what" -Verbose
+    PS C:\> Install-PKVSCodePortable -TargetPath "C:\MyPath" -URI "https://this.seems-like-a-dodgy-path.right" -Verbose
     Downloads and installs or updates VSCode Portable in a non-default path from a non-default URI
 
 #>
@@ -55,21 +62,25 @@ Function Install-PKVSCodePortable {
         [string]$TargetPath = "$Home\VSCode",
 
         [Parameter(
-            HelpMessage = "URI for VSCode zip file download; change at your peril!"
+            HelpMessage = "URI for portable VSCode zip file download; change at your peril!"
         )]
         [ValidateNotNullOrEmpty()]
         [string]$URI = "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-archive",
 
         [Parameter(
-            HelpMessage = "Force download and update even if current version matches new version"
+            HelpMessage = "Update current installation even if no newer version was found"
         )]
-        [switch]$Force
+        [switch]$ForceUpdate,
 
+        [Parameter(
+            HelpMessage = "Stop any running VSCode Portable process in the specified path (requires elevation)"
+        )]
+        [switch]$KillRunningProcess
     )
     Begin {
 
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.00.0000"
+        [version]$Version = "01.02.0000"
 
         # How did we get here?
         [switch]$PipelineInput = $MyInvocation.ExpectingInput
@@ -87,9 +98,21 @@ Function Install-PKVSCodePortable {
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
         # We can't commit suicide - although this could be a different executable, I guess. Let's be safe anyway.
-        If ($Host.Name -match "Visual Studio") {$Msg = "Dude, don't run this from *inside* Visual Studio Code! Please close it and try again from a regular pwsh shell."; Throw $Msg}
+        If ($Host.Name -match "Visual Studio") {
+            $Msg = "You can't run this from *inside* Visual Studio Code! Please close it and try again from a regular pwsh shell." 
+            Write-Warning $Msg
+            Break
+        }
 
         #region Inner functions
+        
+        # check for session elevation
+        Function _IsElevated {
+            If ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+                [boolean]$True
+            }
+            Else {[boolean]$False}
+        }
 
         # find the current filename
         Function _GetRedirectedURL {
@@ -126,7 +149,6 @@ Function Install-PKVSCodePortable {
             )
             If ($Sourcefile -is [System.IO.FileSystemInfo]) { $FileObj = $SourceFile }
             Elseif ($SourceFile -is [string]) { $FileObj = Get-Item $SourceFile | Where-Object { -not $_.PSIsContainer } }
-
             If (-not $PSBoundParameters.TargetFolder) { $Folderobj = Get-Item ($FileObj.FullName | Split-Path -Parent) }
             ElseIf ($TargetFolder -is [System.IO.DirectoryInfo]) { $FolderObj = $TargetFolder }
             Elseif ($TargetFolder -is [string]) { $FolderObj = Get-Item $TargetFolder | Where-Object { -not $_.PSIsContainer } }
@@ -175,270 +197,184 @@ Function Install-PKVSCodePortable {
 
         #endregion Inner functions
 
-        $Activity = "Download and install VSCode Portable"
+        # Make sure we can do this 
+        If ($KillRunningProcess.IsPresent -and -not (_IsElevated)) {
+            $Msg = "Session elevation required for -KillRunningProcess! Note that you can manually stop VSCode Portable and re-run without elevation..."
+            Write-Warning $Msg 
+            Break
+        }
+
+        $Activity = "Download and install latest version of VSCode Portable"
         Write-Verbose "[BEGIN: $ScriptName] $Activity"
 
     } #end begin
 
     Process {
-        # Set the flag (because too many nested try/catch statements are annoying)
-        [switch]$Continue = $True
-
-        # Create log file
-        $Logfile = New-Item -ItemType File -Path "$TargetPath\$(get-date -f yyyy-MM-dd)_vscode_portable.log" -Force -ErrorAction Stop
         
-        #region Quickly check newest version available
-        If ($Continue.IsPresent) {
-            $Continue = $False
-            $Msg = "Getting latest VSCode zip file name"
-            Write-Verbose "[$Env:ComputerName] $Msg"
+        Try {
+            Set-Location $Home
+            [switch]$IsInstalled = $False
+            [switch]$Continue = $True
+            
+            $Msg =  "Looking for existing installation" 
+            Write-Host "[$Env:ComputerName] $Msg"
             Write-Progress -Activity $Activity -CurrentOperation $Msg
-            Try {
-                $FileName = [System.IO.Path]::GetFileName((_GetRedirectedURL $URI -ErrorAction Stop))
-                If ($Filename -match "^VSCode-Win32-x64") {
-                    $Version = [regex]::Matches($FileName, "(\d+\.)?(\d+\.)?(\*|\d+)").value | 
-                        Where-Object { $_ -match '(.*?(?=\.\d))\.(.+)' }
-                    If ($CurrentExecutable = Get-command "$TargetPath\code.exe" -ErrorAction SilentlyContinue) {
-                        $CurrentVersion = $CurrentExecutable.Version.ToString()
-                        If ([version]$Version -gt [version]$CurrentVersion) {
-                            $Msg = "Update availalable! Latest version is $Version; you are currently running $CurrentVersion"                            
-                            Write-Verbose "[$Env:ComputerName] $Msg"
-                            "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                            $Continue = $True
+            If ($CurrentFile = Get-Item "$TargetPath\code.exe" -ErrorAction SilentlyContinue) {
+                [version]$CurrentVersion = $CurrentFile.VersionInfo.FileVersionRaw
+                $Msg = "VSCode Portable $CurrentVersion found in $TargetPath"
+                Write-Host "[$Env:ComputerName] $Msg"
+                $IsInstalled = $True
+                Try {
+                    $Msg =  "Looking for running VSCode Portable process" 
+                    Write-Host "[$Env:ComputerName] $Msg"
+                    If ([switch]$IsRunning = (Get-Process -Name code -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.Path.ToString() -eq $CurrentFile.FullName} -ErrorAction SilentlyContinue).Count -gt 0) {
+                        $Msg = "VSCode Portable is currently running from $TargetPath"
+                        If ($KillRunningProcess.IsPresent) {
+                            $Msg += "; -KillRunningProcess detected"
+                            Write-Host "[$Env:ComputerName] $Msg"
                         }
                         Else {
-                            $Msg = "No newer version available; latest available is $Version and you are currently running $CurrentVersion"
-                            If ($Force.IsPresent) {
-                                $Msg += "; -Force detected" 
-                                $Continue = $True
-                            }
-                            "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
+                            $Msg += "; -KillRunningProcess not detected"
                             Write-Warning "[$Env:ComputerName] $Msg"
                         }
                     }
-                    Else {
-                        $Msg = "Found VSCode $Version available for download from $URI"
-                        "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                        Write-Verbose "[$Env:ComputerName] $Msg"
-                        $Continue = $True
-                    }
-                }
+                }Catch {}
             }
-            Catch {
-                $Msg = "[$Env:ComputerName] Failed to get latest VSCode file name $($_.Exception.Message)"
-                "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                Write-Warning "[$Env:ComputerName] $Msg"
-            }    
-        }
-        #endregion Quickly check newest version available
+            Else {
+                $Msg = "No current version of VSCode detected in $TargetPath"
+                Write-Host "[$Env:ComputerName] $Msg"
+                $TargetPath = New-Item "$Home\VSCode" -ItemType Directory -Force -ErrorAction Stop -Confirm:$False | Select-Object -ExpandProperty FullName 
+            }
+            
+            If ($Continue.IsPresent) {
+                $Continue = $False 
 
-        #region Download file
-        If ($Continue.IsPresent) {
-            $Continue = $False
-
-            Try {
-                $OutFile = "$([System.IO.Path]::GetTempFileName().Replace('.tmp','.zip'))"
-                $Null = Get-Item $Outfile -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction Stop
-
-                $Msg = "Downloading zip file to temporary file using Invoke-WebRequest"
-                Write-Verbose "[$Env:ComputerName] $Msg"
+                $Msg =  "Getting latest version available of VSCode Portable" 
+                Write-Host "[$Env:ComputerName] $Msg"
                 Write-Progress -Activity $Activity -CurrentOperation $Msg
-                If ($PSCmdlet.ShouldProcess($Env:COMPUTERNAME, $Msg)) {
-                    Try {
-                        $Null = Invoke-WebRequest -Uri $Uri -UseBasicParsing -Method Get -OutFile $Outfile -ErrorAction Stop 
-                        If ($Null = Get-Item $Outfile -ErrorAction SilentlyContinue) {
-                            $Msg = "Successfully downloaded $Filename to $Outfile ($([math]::round((get-item $Outfile).length/1mb)) MB)"
-                            Write-Verbose "[$Env:ComputerName] $Msg"
-                            "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                            $Continue = $True
+                $NewFileName = [System.IO.Path]::GetFileName((_GetRedirectedURL $URI -ErrorAction Stop)) | Where-Object {$_ -match "^VSCode-Win32-x64"}
+            
+                # Compare versions 
+                If ([version]$NewVersion = [regex]::Matches($NewFileName, "(\d+\.)?(\d+\.)?(\*|\d+)").value | Where-Object { $_ -match '(.*?(?=\.\d))\.(.+)' }) {
+
+                    If ($IsInstalled.IsPresent) {
+                        If ((-not ($Newversion -gt $CurrentVersion)) -and (-not $ForceUpdate.IsPresent)) {
+                            $Msg = "No newer version available; -ForceUpdate not detected"
+                            Write-Host "[$Env:ComputerName] $Msg"
+                            $Continue = $False
                         }
                         Else {
-                            $Msg = "[$Env:ComputerName] Failed to download file! $($_.Exception.Message)"
-                            "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                            Write-Warning "[$Env:ComputerName] $Msg"
+                            $Msg = "VSCode Portable $NewVersion is available for download"
+                            Write-Host "[$Env:ComputerName] $Msg"
+                            $Continue = $True
                         }
                     }
-                    Catch {
-                        $Msg = "[$Env:ComputerName] Failed to download file! $($_.Exception.Message)"
-                        "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                        Write-Warning "[$Env:ComputerName] $Msg"
-                    }
-                }        
-            }
-            Catch {
-                $Msg = "[$Env:ComputerName] Error! $($_.Exception.Message)"
-                "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                Write-Warning "[$Env:ComputerName] $Msg"
-            }
-        }
-        #endregion Download file 
-
-        #region Validate or create target path
-        If ($Continue.IsPresent) {
-            $Continue = $False
-
-            $Msg = "Validating target path and data subfolder"
-            Write-Verbose "[$Env:ComputerName] $Msg"
-            Write-Progress -Activity $Activity -CurrentOperation $Msg
-            If (Get-Item -Path $TargetPath -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer }) {
-                If ($DataFolder = Get-Item -Path "$TargetPath\Data" -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer }) {
-                    $Msg = "Found $($Datafolder.FullName), lastwritetime $(Get-Date $Datafolder.LastWriteTime -f u)"
-                    Write-Verbose "[$Env:ComputerName] $Msg"
-                    "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                    $Continue = $True
+                    Else {$Continue = $True}
                 }
                 Else {
-                    If ($PSCmdlet.ShouldProcess($TargetPath, "Create new data subfolder?")) {
-                        Try {
-                            $NewFolder = New-Item -Path "$TargetPath\Data" -ItemType Directory -Confirm:$False -ErrorAction Stop
-                            $Msg = "Created $($NewFolder.FullName)"
-                            Write-Verbose "[$Env:ComputerName] $Msg"
-                            "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                            $Continue = $True
-                        }
-                        Catch {
-                            $Msg = "Error! failed to create '$TargetPath\Data' $($_.Exception.Message)"; 
-                            "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                            Write-Warning "[$Env:ComputerName] $Msg"
-                        }
-                    }
-                }
-            } #end if path exists
-            Else {
-                If ($PSCmdlet.ShouldProcess($Env:COMPUTERNAME, "Create target path and data subfolder?")) {
-                    Try {
-                        $NewFolder = New-Item -Path "$TargetPath\Data" -ItemType Directory -Confirm:$False -ErrorAction Stop
-                        $Msg = "Created $($NewFolder.FullName)"
-                        Write-Verbose "[$Env:ComputerName] $Msg"
-                        "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                        $Continue = $True
-                    }
-                    Catch {
-                        $Msg = "Error! failed to create target path '$TargetPath\Data' $($_.Exception.Message)"
-                        "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                        Write-Warning "[$Env:ComputerName] $Msg"
-                    }
-                }
-            }
-        }
-
-        #region Stop any running processes
-        If ($Continue.IsPresent) {
-            $Continue = $False
-            Try {
-                $Process = Get-Process code -ErrorAction SilentlyContinue | Where-Object {$_.Path -eq "$TargetPath\code.exe"} -ErrorAction SilentlyContinue
-                $Msg = "Detected running VSCode processes from target folder $TargetPath"
-                Write-Warning "[$Env:ComputerName] $Msg"
-                $ConfirmMsg = "Stop all current code.exe processes from $TargetPath?"
-                If ($PSCmdlet.ShouldProcess($Env:ComputerName,$ConfirmMsg)) {
-                    Try {
-                        $Process | Stop-Process -PassThru -Force -Confirm:$False
-                        $Continue = $True
-                        $Msg = "Stopped running code.exe processes in $TargetPath"
-                        "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                        Write-Warning "[$Env:ComputerName] $Msg"
-                    }
-                    Catch {
-                        $Msg = "Error! Failed to stop current process(es) $($_.Exception.Message)"
-                        If ($Force.IsPresent) {
-                            $Msg += "; -Force detected" 
-                            $Continue = $True
-                        }
-                        "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                        Write-Warning "[$Env:ComputerName] $Msg"
-                    }
-                }
-            }
-            Catch {
-                $Msg = "Failed to get current process(es) $($_.Exception.Message)"
-                Write-Warning "[$Env:ComputerName] $($_.Exception.Message)"
-                "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-            }
-        }
-        #endregion Stop any running processes
-
-        #region Purge current folder except data folder & shortcut
-        If ($Continue.IsPresent) {
-            $Continue = $False
-            $Msg = "Removing prior version in $Targetpath, if present"
-            If ($Null = Get-Childitem "$TargetPath\Data" -Recurse) { $Msg += " (excluding shortcut file & \data subfolder contents, if applicable)" }
-            Write-Verbose "[$Env:ComputerName] $Msg"
-            Write-Progress -Activity $Activity -CurrentOperation $Msg
-            Try {
-                $Null = _PurgeFolder -Source $TargetPath -Verbose -ErrorAction Stop
-                $Msg = "Successfully removed prior version content, if any (excluding data subfolder and shortcut file)"
-                Write-Verbose "[$Env:ComputerName] $Msg"
-                "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                $Continue = $True
-            }
-            Catch {
-                $Msg = "Failed to purge existing folder contents! $($_.Exception.Message)"
-                "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                Write-Warning "[$Env:ComputerName] $Msg"
-            }
-        }        
-        #endregion Purge current folder except data folder & shortcut
-
-        #region Expand download file to target path
-        If ($Continue.IsPresent) {
-            $Continue = $False
-            $Msg = "Extracting $Outfile contents to $Targetpath"
-            Write-Verbose "[$Env:ComputerName] $Msg"
-            Write-Progress -Activity $Activity -CurrentOperation $Msg
-            If ($PSCmdlet.ShouldProcess($Env:COMPUTERNAME, $Msg)) {
-                Try {
-                    $Null = Expand-Archive -Path $Outfile -DestinationPath $Targetpath -force -ErrorAction Stop
-                    $Executable = Get-Childitem $Targetpath -Recurse -filter "code.exe" -ErrorAction Stop
-                    $Version = ($Executable.VersionInfo).ProductVersion
-                    $Logfile = New-Item -ItemType File -Path "$TargetPath\$(get-date -f yyyy-MM-dd)_vscode-$Version`_install.log" -Force -ErrorAction Stop
-                    "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] Successfully updated VSCode Portable to $Version in $TargetPath on $Env:ComputerName" | Out-File $Logfile -Append
-                    $Msg = "Successfully expanded VSCode Portable to $Targetpath"
-                    Write-Verbose "[$Env:ComputerName] $Msg"
-                    "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-                    $Continue = $True
-                }
-                Catch {
-                    $Msg = "Error! Failed to expand archive $($_.Exception.Message)"
-                    "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
+                    $Msg = "No download found! Please verify your URI is correct."
                     Write-Warning "[$Env:ComputerName] $Msg"
                 }
             }
+
+            If ($Continue.IsPresent) {
+                $Continue = $False
+
+                If ($PSCmdlet.ShouldProcess($TargetPath, "Download and extract VSCode portable $($NewVersion.ToString())"))  {
+                    
+                    # Create random name
+                    [string]$DownloadFile = "$Env:Temp\$(-join (65..90 | ForEach-Object { [char]$_ } | Get-Random -Count 12)).zip"
+
+                    $Msg = "Downloading VSCode Portable $($NewVersion.ToString()) to $DownloadFile"
+                    Write-Host "[$Env:ComputerName] $Msg"
+                    Write-Progress -Activity $Activity -CurrentOperation $Msg
+                    Invoke-WebRequest -Uri $uri -OutFile $DownloadFile -UseBasicParsing -Verbose:$False
+                        
+                    If ($FileObj = Get-Item $DownloadFile -ErrorAction SilentlyContinue) {
+
+                        $Msg = "Successfully downloaded $DownloadFile"
+                        Write-Host "[$Env:ComputerName] $Msg"
+
+                        If ($IsRunning.IsPresent) {
+                            Switch ($KillRunningProcess) {
+                                $True {
+                                    $Msg = "; killing running $TargetPath processes"
+                                    Write-Host "[$Env:ComputerName] $Msg" -ForegroundColor Yellow
+                                    If ($PSCmdlet.ShouldProcess($Env:ComputerName, "Kill running code.exe processes from $TargetPath?")) {
+                                        Try {
+                                            $Null = Get-Process code -ErrorAction SilentlyContinue | Where-Object {$_.Path -eq "$TargetPath\code.exe"} -ErrorAction SilentlyContinue | 
+                                                Stop-Process -PassThru -Force -Confirm:$False -ErrorAction Stop
+                                                $Continue = $True
+                                        }
+                                        Catch {
+                                            $Msg = "[$Env:ComputerName] $($_.Exception.Message)"
+                                            Write-Warning "[$Env:ComputerName] $Msg"
+                                        }
+                                    }
+                                    Else {
+                                        $Msg = "Operation cancelled by user; script will now exit"
+                                        Write-Warning "[$Env:ComputerName] $Msg" 
+                                    }
+                                }
+                                $False {
+                                    $Msg = "VSCode Portable is already running from $TargetPath; -KillRunningProcess not specified"
+                                    Write-Warning "[$Env:ComputerName] $Msg" 
+                                }
+                            } # end switch 
+                        } # End if running
+                        Else {$Continue = $True}
+
+                        If ($Continue.IsPresent) {
+            
+                            $Null = $FileObj | Unblock-File -Confirm:$False
+                            If ($IsInstalled.IsPresent) {    
+                                $Msg = "Removing current version (excluding shortcuts and \data subfolder)"
+                                Write-Host "[$Env:ComputerName] $Msg" 
+                                Get-ChildItem -Path  $TargetPath -exclude "data", "*.lnk" -Force | Remove-Item -force -recurse -Confirm:$False
+                            }
+                            Try {
+                                $Msg = "Expanding $DownloadFile to $TargetPath"
+                                Write-Host "[$Env:ComputerName] $Msg" 
+                                $Null = Add-Type -AssemblyName System.IO.Compression.FileSystem
+                                [System.IO.Compression.ZipFile]::ExtractToDirectory($DownloadFile, $TargetPath)
+                                $Msg = "Downloaded and expanded VSCode Portable $($NewVersion.ToString()) in $TargetPath"
+                                "[$(Get-Date -f u)] $Msg" | Out-File $TargetPath\InstallLog.txt -Force
+                                Write-Host "[$Env:ComputerName] $Msg" -ForegroundColor Green
+                            } 
+                            Catch {
+                                Write-Warning "[$Env:ComputerName] $($_.Exception.Message)"
+                            }
+                            Finally {
+                                $Msg = "Removing temporary file $DownloadFile"
+                                Write-Host "[$Env:ComputerName] $Msg" 
+                                $Null = Remove-Item $DownloadFile -Force -Confirm:$False -ErrorAction SilentlyContinue
+                            }
+                        }
+                    }
+                    Else {
+                        $Msg = "Failed to download $URI to $DownloadFile"
+                        Write-Warning "[$Env:ComputerName] $Msg"
+                    }
+                }  # end if shouldprocess
+                Else {
+                    $Msg = "Operation cancelled by user"
+                    Write-Host "[$Env:ComputerName] $Msg"
+                }    
+            } #end if new continue
+            
         }
-        #endregion Expand download file to target path
-
-        #region Update path and create shortcut 
-        
-        If ($Continue.IsPresent) {
-            $Continue = $False
-
-            _UpdatePath -NewPath $TargetPath
-
-            If (-not ($Null = Get-Item "$Targetpath\code.lnk" -ErrorAction SilentlyContinue)) {
-                $Msg = "Creating shortcut to code.exe"
-                Write-Verbose "[$Env:ComputerName] $Msg"
-                Write-Progress -Activity $Activity -CurrentOperation $Msg
-                _AddShortcut -SourceFile $Executable.FullName -Verbose 
-                $Msg = "Added shortcut to $Targetpath\code.exe"
-                Write-Verbose "[$Env:ComputerName] $Msg"
-                "[$(Get-Date -f 'yyyy-MM-dd HH:mm:ss')] $Msg" | Out-File $Logfile -Append
-            }
+        Catch {
+            Write-Warning "[$Env:ComputerName] $($_.Exception.Message)"
         }
-        #endregion Create shortcut 
+    } #end process
 
-    }
     End {
-
-        Try {
-            If (Get-Item $LogFile -ErrorAction SilentlyContinue) {
-                $Msg = "Script is complete; log file can be found at $LogFile (contents below)"
-                Write-Verbose "[$Env:ComputerName] $Msg"
-                Get-Content $LogFile
-            }
-        }
-        Catch {}
-
-        $Null = Get-Item $Outfile -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+        Write-Progress -Activity * -Completed 
         Write-Verbose "[END $ScriptName]"
     }
-} #end function
+} #end Install-PKVSCodePortable
+
+
+$Null = New-Alias Update-PKVSCodePortable -Value Install-PKVSCodePortable -Force -ErrorAction SilentlyContinue -Description "Alias for Install-PKVSCodePortable for easier navigation/findability"
 
