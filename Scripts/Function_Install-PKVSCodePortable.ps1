@@ -17,7 +17,7 @@ Function Install-PKVSCodePortable {
     Name    : Function_Install-PKVSCodePortable.ps1
     Created : 2024-04-17
     Author  : Paula Kingsley
-    Version : 01.02.0000
+    Version : 01.03.0000
     History :
     
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
@@ -25,6 +25,7 @@ Function Install-PKVSCodePortable {
         v01.00.0000 - 2024-04-17 - Created script
         v01.01.0000 - 2024-07-22 - Updates and fixes
         v01.02.0000 - 2024-10-25 - Fixed error in continue
+        v01.03.0000 - 2025-01-31 - Added backup option
 
 .LINK
     https://stackoverflow.com/questions/25125818/powershell-invoke-webrequest-how-to-automatically-use-original-file-name
@@ -68,6 +69,11 @@ Function Install-PKVSCodePortable {
         [string]$URI = "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-archive",
 
         [Parameter(
+            HelpMessage = "Don't back up \Data folder or code.lnk shortcut file if present (if not specified, creates backup copy in user's temp directory)"
+        )]
+        [switch]$NoBackup,
+
+        [Parameter(
             HelpMessage = "Update current installation even if no newer version was found"
         )]
         [switch]$ForceUpdate,
@@ -80,7 +86,7 @@ Function Install-PKVSCodePortable {
     Begin {
 
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.02.0000"
+        [version]$Version = "01.03.0000"
 
         # How did we get here?
         [switch]$PipelineInput = $MyInvocation.ExpectingInput
@@ -124,6 +130,29 @@ Function Install-PKVSCodePortable {
             Else {Write-Warning "Failed to get filename from $URL"; $False}
         }
 
+        # Backup data folder to user's temp directory, if found
+        Function _BackupFolder {
+            [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = "Low")]
+            Param($Source, $Exclude = @("Data", "code.lnk"))
+            $BackupPath = "$Env:Temp\VSCodeBackup-$((Get-Date).ToString('yyyyMMdd-HHmmss'))"
+            If ($DataFolder = Get-Item "$Source\Data" -ErrorAction SilentlyContinue) {
+                $Msg = "Making backup copy of \Data subfolder to $BackupPath"
+                Write-Verbose "[$Source] $Msg"
+                Try {
+                    $DataFolder | Copy-Item -Destination $BackupPath -Recurse -Force -Confirm:$False -ErrorAction Stop
+                }
+                Catch {Write-Warning $_.Exception.Message}
+            }
+            If ($Shortcut = Get-Item "$Source\code.lnk" -ErrorAction SilentlyContinue) {
+                $Msg = "Making backup copy of \Data subfolder to $BackupPath"
+                Write-Verbose "[$Source] $Msg"
+                Try {
+                    $Shortcut | Copy-Item -Destination $BackupPath -Force -Confirm:$False -ErrorAction Stop
+                }
+                Catch {Write-Warning $_.Exception.Message}
+            }
+        }
+        
         # Purge code folder except for date folder/shortcut file, if present
         Function _PurgeFolder {
             [Cmdletbinding(SupportsShouldProcess, ConfirmImpact = "High")]
@@ -247,6 +276,7 @@ Function Install-PKVSCodePortable {
                 $TargetPath = New-Item "$Home\VSCode" -ItemType Directory -Force -ErrorAction Stop -Confirm:$False | Select-Object -ExpandProperty FullName 
             }
             
+            # Check for new version
             If ($Continue.IsPresent) {
                 $Continue = $False 
 
@@ -257,7 +287,6 @@ Function Install-PKVSCodePortable {
             
                 # Compare versions 
                 If ([version]$NewVersion = [regex]::Matches($NewFileName, "(\d+\.)?(\d+\.)?(\*|\d+)").value | Where-Object { $_ -match '(.*?(?=\.\d))\.(.+)' }) {
-
                     If ($IsInstalled.IsPresent) {
                         If ((-not ($Newversion -gt $CurrentVersion)) -and (-not $ForceUpdate.IsPresent)) {
                             $Msg = "No newer version available; -ForceUpdate not detected"
@@ -276,13 +305,13 @@ Function Install-PKVSCodePortable {
                     $Msg = "No download found! Please verify your URI is correct."
                     Write-Warning "[$Env:ComputerName] $Msg"
                 }
-            }
+            } # end checking for new version
 
+            # Download & expand
             If ($Continue.IsPresent) {
                 $Continue = $False
 
                 If ($PSCmdlet.ShouldProcess($TargetPath, "Download and extract VSCode portable $($NewVersion.ToString())"))  {
-                    
                     # Create random name
                     [string]$DownloadFile = "$Env:Temp\$(-join (65..90 | ForEach-Object { [char]$_ } | Get-Random -Count 12)).zip"
 
@@ -292,7 +321,6 @@ Function Install-PKVSCodePortable {
                     Invoke-WebRequest -Uri $uri -OutFile $DownloadFile -UseBasicParsing -Verbose:$False
                         
                     If ($FileObj = Get-Item $DownloadFile -ErrorAction SilentlyContinue) {
-
                         $Msg = "Successfully downloaded $DownloadFile"
                         Write-Host "[$Env:ComputerName] $Msg"
 
@@ -326,14 +354,53 @@ Function Install-PKVSCodePortable {
                         Else {$Continue = $True}
 
                         If ($Continue.IsPresent) {
-            
-                            $Null = $FileObj | Unblock-File -Confirm:$False
-                            If ($IsInstalled.IsPresent) {    
-                                $Msg = "Removing current version (excluding shortcuts and \data subfolder)"
-                                Write-Host "[$Env:ComputerName] $Msg" 
-                                Get-ChildItem -Path  $TargetPath -exclude "data", "*.lnk" -Force | Remove-Item -force -recurse -Confirm:$False
+                            $Continue = $False
+                            If ($NoBackup.IsPresent) {
+                                $Msg = "Skipping backup of \Data folder and code.lnk shortcut file"
+                                Write-Host "[$Env:ComputerName] $Msg"
+                                $Continue = $True
                             }
+                            Else {
+                                Try {
+                                    _BackupFolder -Source $TargetPath -ErrorAction Stop
+                                    $Continue = $True
+                                }
+                                Catch {
+                                    Write-Warning "[$Env:ComputerName] $($_.Exception.Message)"
+                                }
+                            }
+                        }
+
+                        # Empty current folder
+                        If ($Continue.IsPresent) {
+                            If ($IsInstalled.IsPresent) {
+                                $Continue = $False
+                                $Msg = "Removing all files and folders from $TargetPath (excluding shortcuts and \data subfolder)"
+                                Write-Host "[$Env:ComputerName] $Msg" 
+                                $Msg = "Remove all files and folders from $TargetPath (excluding shortcuts and \data subfolder)"
+                                If ($PSCmdlet.ShouldProcess($Env:ComputerName,$Msg)) {
+                                    Try {
+                                        Get-ChildItem -Path  $TargetPath -exclude "data", "*.lnk" -Force -ErrorAction Stop | 
+                                            Remove-Item -force -recurse -Confirm:$False -ErrorAction Stop
+                                        $Continue = $True
+                                    }
+                                    Catch {
+                                        $Msg = "Operation failed! $($_.Exception.Message)"
+                                        Write-Error "[$Env:ComputerName] $Msg"
+                                    }
+                                }   
+                                Else {
+                                    $Msg = "Operation cancelled by user"
+                                    Write-Host "[$Env:ComputerName] $Msg"
+                                } 
+                            }
+                        }
+
+                        # Unblock & expand downloaded file
+                        If ($Continue.IsPresent) {
+                            
                             Try {
+                                $Null = $FileObj | Unblock-File -Confirm:$False
                                 $Msg = "Expanding $DownloadFile to $TargetPath"
                                 Write-Host "[$Env:ComputerName] $Msg" 
                                 $Null = Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -343,7 +410,7 @@ Function Install-PKVSCodePortable {
                                 Write-Host "[$Env:ComputerName] $Msg" -ForegroundColor Green
                             } 
                             Catch {
-                                Write-Warning "[$Env:ComputerName] $($_.Exception.Message)"
+                                Write-Error "[$Env:ComputerName] $($_.Exception.Message)"
                             }
                             Finally {
                                 $Msg = "Removing temporary file $DownloadFile"
@@ -351,22 +418,22 @@ Function Install-PKVSCodePortable {
                                 $Null = Remove-Item $DownloadFile -Force -Confirm:$False -ErrorAction SilentlyContinue
                             }
                         }
-                    }
+                    } # end if download successful
                     Else {
                         $Msg = "Failed to download $URI to $DownloadFile"
-                        Write-Warning "[$Env:ComputerName] $Msg"
+                        Write-Error "[$Env:ComputerName] $Msg"
                     }
                 }  # end if shouldprocess
                 Else {
                     $Msg = "Operation cancelled by user"
                     Write-Host "[$Env:ComputerName] $Msg"
                 }    
-            } #end if new continue
-            
+            } #end if continuing to download
         }
         Catch {
             Write-Warning "[$Env:ComputerName] $($_.Exception.Message)"
         }
+        Finally {Write-Progress -Activity * -Completed }
     } #end process
 
     End {

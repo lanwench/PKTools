@@ -19,13 +19,14 @@ function New-PKPassphrase {
         Name    : Function_New-PKPassphrase.ps1
         Created : 2024-04-03
         Author  : Paula Kingsley
-        Version : 02.00.0000
+        Version : 03.00.0000
         History :
         
             ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
     
             v01.00.0000 - 2024-04-03 - Created script
             v02.00.0000 - 2024-04-26 - Learned stuff, fixed stuff, added stuff
+            v03.00.0000 - 2025-03-21 - Replaced loripsum.net api with https://fakeapi.net/lorem
     
     .LINK
         https://scriptposse.com/2020/04/24/random-word-function/
@@ -146,7 +147,7 @@ function New-PKPassphrase {
         Begin {
     
             # Current version (please keep up to date from comment block)
-            [version]$Version = "02.00.0000"
+            [version]$Version = "03.00.0000"
     
             # Show our settings
             $ScriptName = $MyInvocation.MyCommand.Name
@@ -164,7 +165,11 @@ function New-PKPassphrase {
     
             Switch ($Dictionary) {
                 English {$URI = "https://raw.githubusercontent.com/RazorSh4rk/random-word-api/master/words.json"}
-                LoremIpsum {$URI = "https://loripsum.net/api?type=short"}
+                LoremIpsum {
+                    #$URI = "https://fakeapi.net/lorem/$Count"
+                    $URI = "https://fakeapi.net/lorem/50"
+                    #$URI = "https://loripsum.net/api?type=short"
+                }
             }
     
             Function _GetDictionary{
@@ -177,8 +182,9 @@ function New-PKPassphrase {
                                         ForEach-Object {$_.Trim().ToLower()} 
                         }
                         LoremIpsum {
-                            ((Invoke-WebRequest -Uri $URI -UseBasicParsing -Method Get -Verbose:$False -ErrorAction SilentlyContinue).Content -replace "[^\w\s]+", " " -replace "\s+", " ") -split(" ") | 
-                                Where-Object {$_.Length -gt 2 -and $_.length -lt 8}  |  
+                            # This uri will return 50 by default - we can then get the number we want later. But we first want to make sure the strings are between 2 - 8 chars max.
+                            ((Invoke-WebRequest -Uri $URI -UseBasicParsing -Method Get -Verbose:$False -ErrorAction SilentlyContinue).Content | ConvertFrom-JSON | Select-Object -ExpandProperty Text) -split(" ") | 
+                                Where-Object {$_.Length -gt 2 -and $_.length -lt 8} | 
                                     ForEach-Object {$_.Trim().ToLower()} |  
                                         Select-Object -Unique -CaseInsensitive
                         }

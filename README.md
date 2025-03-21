@@ -6,11 +6,11 @@
 |**Name** |PKTools|
 |**Author** |Paula Kingsley|
 |**Type** |Script|
-|**Version** |2.19.0|
+|**Version** |2.30.0|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Friday, October 25, 2024 7:34:46 PM|
+|**Date**|README.md file generated on Friday, March 21, 2025 3:49:08 PM|
 
-This module contains 30 PowerShell functions or commands
+This module contains 32 PowerShell functions or commands
 
 All functions should have reasonably detailed comment-based help, accessible via Get-Help ... e.g., 
   * `Get-Help Do-Something`
@@ -38,6 +38,7 @@ _Changelogs are generally found within individual functions, not per module._
 |**Command**|**Version**|**Synopsis**|
 |---|---|---|
 |**Backup-PKChromeProfile**|01.01.0000|Backs up Chrome profiles to file|
+|**Backup-PKVSCodeData**|01.00.0000|Backs up the user \Data folder for VSCode to a date-named compressed file in the target path of your choice|
 |**Convert-PKBytesToSize**|01.00.0000|Converts any integer size given to a user friendly size|
 |**Convert-PKEXchangeSMTPLog**|01.00.0000|Parses an Exchange send or receive connector log from a file (string or object) and returns a PSObject|
 |**Convert-PKIISLog**|01.00.0000|Parses an IIS log from a file (string or object) and returns a PSObject|
@@ -53,12 +54,13 @@ _Changelogs are generally found within individual functions, not per module._
 |**Get-PKJOTD**|01.00.0000|Retrieves jokes from the v2.jokeapi.dev API based on specified parameters|
 |**Get-PKSID**|01.00.0000|Gets the SID for one or more local or domain users or groups via .NET|
 |**Get-PKTaniumClient**|01.02.0000|Gets the Tanium Client service and registry configuration from one or more computers, using Get-WMIObject for downlevel compatibility|
-|**Install-PKVSCodePortable**|01.02.0000|Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself!|
+|**Get-PKVSCodeLatestVersion**|01.00.0000|Looks for the latest version of VSCode Portable available for download from code.visualstudio.com, comparing to the current version unless -SkipCurrentVersionCheck is specified|
+|**Install-PKVSCodePortable**|01.03.0000|Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself!|
 |**New-PKCodeSigningCert**|01.01.0000|Creates a new self-signed certificate on the local computer in the current user's certificate store|
 |**New-PKComplexPassword**|01.00.0000|Uses Get-Random and defined character sets to generate a password between 10 and 265 characters, with option to return secure string or plain text|
 |**New-PKFakeIdentity**|01.00.0000|Generates one or more random identities using Invoke-WebRequest and API call to publicapis.io, with option to return only basic details|
 |**New-PKJargonIpsum**|01.00.0000|Want a wall of mission statements? This function generates jargon-filled Lorem Ipsum text from internal dictionary arrays of words, <br/>so you can fit in at your next meeting!|
-|**New-PKPassphrase**|02.00.0000|Uses REST API calls to generates one or more passphrases of English or Lorem Ipsum, <br/>with the option to pick the count, the word count, the separator character, and number of integers|
+|**New-PKPassphrase**|03.00.0000|Uses REST API calls to generates one or more passphrases of English or Lorem Ipsum, <br/>with the option to pick the count, the word count, the separator character, and number of integers|
 |**Open-PKChrome**|01.00.0000|Launches a URL in Chrome, with options for default profile/new window|
 |**Remove-PKAttributeBit**|01.00.0000|Removes one or more filesystem attribute bits from one or more files or folders (recursive)|
 |**Remove-PKMcAfee**|01.00.0000|Removes McAfee Enterprise endpoint client from local computer without a key|
