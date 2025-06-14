@@ -165,11 +165,7 @@ function New-PKPassphrase {
     
             Switch ($Dictionary) {
                 English {$URI = "https://raw.githubusercontent.com/RazorSh4rk/random-word-api/master/words.json"}
-                LoremIpsum {
-                    #$URI = "https://fakeapi.net/lorem/$Count"
-                    $URI = "https://fakeapi.net/lorem/50"
-                    #$URI = "https://loripsum.net/api?type=short"
-                }
+                LoremIpsum {$URI = "https://fakeapi.net/lorem/50"} # Returns 50 by default but then we select 2-6 char max, so we need extra
             }
     
             Function _GetDictionary{

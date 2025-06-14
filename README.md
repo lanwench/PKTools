@@ -8,9 +8,9 @@
 |**Type** |Script|
 |**Version** |2.30.0|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Friday, March 21, 2025 3:49:08 PM|
+|**Date**|README.md file generated on Friday, June 13, 2025 10:51:51 PM|
 
-This module contains 32 PowerShell functions or commands
+This module contains 37 PowerShell functions or commands
 
 All functions should have reasonably detailed comment-based help, accessible via Get-Help ... e.g., 
   * `Get-Help Do-Something`
@@ -52,9 +52,14 @@ _Changelogs are generally found within individual functions, not per module._
 |**Get-PKGPResult**|01.00.0000|Executes gpresult to an HTML or XML file, with the option to modify html font name/size and launch the file with the associated handler|
 |**Get-PKInputObjectType**|01.00.0000|Uses regex to check the type of the input object, in friendly and full name/type formats.|
 |**Get-PKJOTD**|01.00.0000|Retrieves jokes from the v2.jokeapi.dev API based on specified parameters|
+|**Get-PKPSVersions**|01.00.0000|Retrieves the installed versions and paths of Windows PowerShell and PowerShell Core on the local computer.|
+|**Get-PKPublicIP**|01.0.0000|Retrieves the public IP address of the machine via an API call to the ifconfig.me service|
 |**Get-PKSID**|01.00.0000|Gets the SID for one or more local or domain users or groups via .NET|
+|**Get-PKSpecialChar**|01.00.0000|Retrieves Unicode characters or their corresponding code points based on specified parameters.|
 |**Get-PKTaniumClient**|01.02.0000|Gets the Tanium Client service and registry configuration from one or more computers, using Get-WMIObject for downlevel compatibility|
+|**Get-PKTimeZones**|02.00.0000|Retrieves and displays information about system time zones using [System.TimeZoneInfo]::GetSystemTimeZones()|
 |**Get-PKVSCodeLatestVersion**|01.00.0000|Looks for the latest version of VSCode Portable available for download from code.visualstudio.com, comparing to the current version unless -SkipCurrentVersionCheck is specified|
+|**Get-PKWeather**|01.00.0000|Retrieves current weather conditions for a specified location using the OpenWeatherMap API.|
 |**Install-PKVSCodePortable**|01.03.0000|Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself!|
 |**New-PKCodeSigningCert**|01.01.0000|Creates a new self-signed certificate on the local computer in the current user's certificate store|
 |**New-PKComplexPassword**|01.00.0000|Uses Get-Random and defined character sets to generate a password between 10 and 265 characters, with option to return secure string or plain text|
