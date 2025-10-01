@@ -6,11 +6,11 @@
 |**Name** |PKTools|
 |**Author** |Paula Kingsley|
 |**Type** |Script|
-|**Version** |2.30.0|
+|**Version** |2.32.0|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Friday, June 13, 2025 10:51:51 PM|
+|**Date**|README.md file generated on Wednesday, October 1, 2025 8:40:40 AM|
 
-This module contains 37 PowerShell functions or commands
+This module contains 38 PowerShell functions or commands
 
 All functions should have reasonably detailed comment-based help, accessible via Get-Help ... e.g., 
   * `Get-Help Do-Something`
@@ -49,6 +49,7 @@ _Changelogs are generally found within individual functions, not per module._
 |**Get-PKADDisabledObject**|01.00.0000|Retrieves details of disabled Active Directory objects|
 |**Get-PKADUserDisabledDate**|01.00.0000|Uses Get-ADUser and Get-ADReplicationAttributeMetadata to return the date user objects were disabled|
 |**Get-PKDateTimeExamples**|01.00.0000|Returns standard or unix format date/time formatting options with examples and descriptions|
+|**Get-PKFileReport**|01.00.0000|Generates an HTML report of files in a specified directory, including summary statistics and detailed file information.|
 |**Get-PKGPResult**|01.00.0000|Executes gpresult to an HTML or XML file, with the option to modify html font name/size and launch the file with the associated handler|
 |**Get-PKInputObjectType**|01.00.0000|Uses regex to check the type of the input object, in friendly and full name/type formats.|
 |**Get-PKJOTD**|01.00.0000|Retrieves jokes from the v2.jokeapi.dev API based on specified parameters|
