@@ -6,11 +6,11 @@
 |**Name** |PKTools|
 |**Author** |Paula Kingsley|
 |**Type** |Script|
-|**Version** |2.32.0|
+|**Version** |2.33.0|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Wednesday, October 1, 2025 8:40:40 AM|
+|**Date**|README.md file generated on Tuesday, January 13, 2026 10:30:41 AM|
 
-This module contains 38 PowerShell functions or commands
+This module contains 44 PowerShell functions or commands
 
 All functions should have reasonably detailed comment-based help, accessible via Get-Help ... e.g., 
   * `Get-Help Do-Something`
@@ -40,6 +40,7 @@ _Changelogs are generally found within individual functions, not per module._
 |**Backup-PKChromeProfile**|01.01.0000|Backs up Chrome profiles to file|
 |**Backup-PKVSCodeData**|01.00.0000|Backs up the user \Data folder for VSCode to a date-named compressed file in the target path of your choice|
 |**Convert-PKBytesToSize**|01.00.0000|Converts any integer size given to a user friendly size|
+|**Convert-PKCollectionToString**|01.00.0000|Converts object properties containing collections (arrays) into flattened strings<br/>for safe and clean export to CSV, avoiding the [system]System.Object[] value|
 |**Convert-PKEXchangeSMTPLog**|01.00.0000|Parses an Exchange send or receive connector log from a file (string or object) and returns a PSObject|
 |**Convert-PKIISLog**|01.00.0000|Parses an IIS log from a file (string or object) and returns a PSObject|
 |**ConvertTo-PKCSV**|01.00.0000|Performs ConvertTo-CSV on an input object, with customizeable delimiter and options to remove header row/quotes|
@@ -48,11 +49,16 @@ _Changelogs are generally found within individual functions, not per module._
 |**Format-PKLDAPFilter**|01.00.0000|Formats an LDAP filter string with line breaks and indentation, outputting as a more visually readable string|
 |**Get-PKADDisabledObject**|01.00.0000|Retrieves details of disabled Active Directory objects|
 |**Get-PKADUserDisabledDate**|01.00.0000|Uses Get-ADUser and Get-ADReplicationAttributeMetadata to return the date user objects were disabled|
+|**Get-PKCertificate**|01.00.0000|Retrieves SSL/TLS certificate details from one or more remote hosts by performing a TCP connection and SSL handshake.|
+|**Get-PKColorInfo**|01.00.0000|Look up color information by Hex code or Name with ANSI color examples, via REST API (default) or local query.|
+|**Get-PKDadJoke**|01.00.0000|Retrieves jokes from the v2.jokeapi.dev API based on specified parameters|
+|**Get-PKDadJoke2**|02.00.0000|Retrieves dad jokes from the icanhazdadjoke API.|
 |**Get-PKDateTimeExamples**|01.00.0000|Returns standard or unix format date/time formatting options with examples and descriptions|
 |**Get-PKFileReport**|01.00.0000|Generates an HTML report of files in a specified directory, including summary statistics and detailed file information.|
-|**Get-PKGPResult**|01.00.0000|Executes gpresult to an HTML or XML file, with the option to modify html font name/size and launch the file with the associated handler|
+|**Get-PKGoogleFSLogErrors**|01.00.0000|Scans local computer Google Drive FileSync log files for errors and returns matching entries.|
+|**Get-PKGPResult**|01.01.0000|Executes gpresult to an HTML or XML file, with the option to modify html font name/size and launch the file with the associated handler|
 |**Get-PKInputObjectType**|01.00.0000|Uses regex to check the type of the input object, in friendly and full name/type formats.|
-|**Get-PKJOTD**|01.00.0000|Retrieves jokes from the v2.jokeapi.dev API based on specified parameters|
+|**Get-PKJOTD**|02.00.0000|Retrieves jokes from the v2.jokeapi.dev API based on specified parameters|
 |**Get-PKPSVersions**|01.00.0000|Retrieves the installed versions and paths of Windows PowerShell and PowerShell Core on the local computer.|
 |**Get-PKPublicIP**|01.0.0000|Retrieves the public IP address of the machine via an API call to the ifconfig.me service|
 |**Get-PKSID**|01.00.0000|Gets the SID for one or more local or domain users or groups via .NET|
