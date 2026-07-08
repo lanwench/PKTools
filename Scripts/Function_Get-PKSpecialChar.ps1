@@ -3,24 +3,25 @@
 Function Get-PKSpecialChar {
 <#
 .SYNOPSIS
-    Retrieves Unicode characters or their corresponding code points based on specified parameters.
+    Retrieves Unicode characters and code points by named range, decimal code, or character
 
 .DESCRIPTION
-    Retrieves Unicode characters or their corresponding code points based on specified parameters.
-    Allows users to retrieve Unicode characters or their code points 
-    based on a specified range, code, or character input. It supports selecting by named Unicode ranges 
-    and includes options to handle non-printable characters.
+    Looks up Unicode characters by named set (e.g., Arrows, Currency), decimal code point, or input character
+    Supports named ranges including Basic Latin, Latin Extended, Mathematical, Currency, Symbols, and others
+    Non-printable characters are handled and noted in output
+    Returns a PSObject with Set, Code, Char, and Syntax properties
 
-.NOTES        
+.NOTES
     Name    : Function_Get-PKSpecialChar.ps1
     Created : 2025-05-13
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
-        
-        v01.00.0000 - 2025-05-13 - Created script
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+        v01.00 - 2025-05-13 - Created script
+        v01.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .INPUTS
     - [string[]] (for the -CodeType' parameter)
@@ -162,7 +163,7 @@ Param(
 )
 Begin {
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01"
 
     # How did we get here
     $Source = $PSCmdlet.ParameterSetName
@@ -399,5 +400,6 @@ End {
     Else {
         Write-Warning "No console-printable characters found in the specified range or code"
     }
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 }
 } # end Get-PKSpecialChar

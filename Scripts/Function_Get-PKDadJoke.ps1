@@ -2,53 +2,43 @@
 Function Get-PKDadJoke {
 <#
 .SYNOPSIS
-    Retrieves jokes from the v2.jokeapi.dev API based on specified parameters
+    Fetches random dad jokes from icanhazdadjoke.com
 
 .DESCRIPTION
-    The Get-PKJOTD function retrieves jokes from the Joke API based on the specified parameters
-    It allows you to specify categories, the number of jokes to return, the style of jokes (two-part, one-liner, or any), and whether to include NSFW (Not Safe for Work) content
-    Responses are converted to UTF8 and returned as a PSCustomObject
-    This was created as a way to have a little fun with a free API endpoint
-    NOTE: It will always filter out the categories 'racist' and 'sexist' but this is no guarantee, so use at your own risk!
+    Uses Invoke-WebRequest to call the icanhazdadjoke.com API
+    Formats multi-part jokes as Q:/A: when a question mark is detected
+    Returns a PSObject with ID and Joke properties
+    Supports -WhatIf and -Confirm because this is a Very Serious Operation
 
 .NOTES
-    Name    : Function_Get-PKJOTD.ps1
+    Name    : Function_Get-PKDadJoke.ps1
     Created : 2024-04-03
     Author  : Paula Kingsley
-    Version : 02.00.0000
+    Version : 02.01
     History :
-    
+
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2024-04-03 - Created script
-        v02.00.0000 - 2025-12-29 - Fixes issue with URI, simplified output/removed inner function
+        v01.00 - 2024-04-03 - Created script
+        v02.00 - 2025-12-29 - Fixes issue with URI, simplified output/removed inner function
+        v02.01 - 2026-06-17 - Cosmetic updates; corrected synopsis/description; converted version format to major.minor
 
 .OUTPUTS
-    PSCustomObject        
+    PSCustomObject
 
-.PARAMETER categories
-    Specifies the categories to search for. By default, it searches for jokes with categories "Programming" and "Miscellaneous".
+.PARAMETER URI
+    URI for the API call (default is https://icanhazdadjoke.com)
 
 .PARAMETER Count
-    Specifies the number of jokes to return. The valid range is between 1 and 10. The default value is 1.
-
-.PARAMETER Style
-    Specifies the style of jokes to return. Valid values are "TwoPart" (two-part jokes), "single" (one-liners), or "any" (any style). The default value is "any".
-
-.PARAMETER IncludeNFSW
-    Specifies whether to include NSFW (Not Safe for Work) content in the results. By default, NSFW content is filtered out. Sexist/racist categories are always filtered out!
+    Number of jokes to return (1-10; default is 1)
 
 .EXAMPLE
-    PS C:\> Get-PKJOTD -categories "Programming" -Count 3 -Style "TwoPart"
-    Retrieves 3 two-part jokes with the tag "Programming".
+    PS C:\> Get-PKDadJoke -Verbose
+    Retrieves a single random dad joke from icanhazdadjoke.com.
 
 .EXAMPLE
-    PS C:\> Get-PKJOTD -Count 5
-    Retrieves 5 jokes with any style and any categories.
-
-.EXAMPLE
-    PS C:\> Get-PKJOTD -Style single -Count 5 -IncludeNFSW
-    Retrieves 3 single jokes and any categories.
+    PS C:\> Get-PKDadJoke -Count 3
+    Retrieves up to 3 random dad jokes.
 
 #>
 
@@ -63,20 +53,21 @@ Function Get-PKDadJoke {
     )
     Begin {
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.00.0000"
+        [version]$Version = "02.01"
 
         # How did we get here?
+        $ScriptName = $MyInvocation.MyCommand.Name
+        $Source = $PSCmdlet.ParameterSetName
         [switch]$PipelineInput = $MyInvocation.ExpectingInput
         $CurrentParams = $PSBoundParameters
-        #If (-not $CurrentParams.Type) {$Type = $CurrentParams.Type = "TwoPart"}
-        $ScriptName = $MyInvocation.MyCommand.Name
-        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
-        Where-Object { Test-Path Variable:$_ } | Foreach-Object {
+        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } |
+        Where-Object { Test-Path Variable:$_ } | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+        $CurrentParams.Add("ParameterSetName", $Source)
+        $CurrentParams.Add("PipelineInput", $PipelineInput)
         $CurrentParams.Add("ScriptName", $ScriptName)
         $CurrentParams.Add("ScriptVersion", $Version)
-        $CurrentParams.Add("PipelineInput", $PipelineInput)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
         
         function Format-DadJoke {
@@ -95,7 +86,7 @@ Function Get-PKDadJoke {
 
 
         $Msg = "Use Invoke-WebRequest and to get some really stupid jokes!"
-        Write-Verbose "[BEGIN:  $ScriptName] $Msg"       
+        Write-Verbose "[BEGIN: $ScriptName] $Msg"
     }
     Process {  
 
@@ -120,7 +111,7 @@ Function Get-PKDadJoke {
         Else {return}
     }
     End {
-        Write-Verbose "[END:  $ScriptName]"
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 } # end Get-PKDadJoke
 
@@ -165,7 +156,8 @@ Function Get-PKDadJoke2 {
 
     Begin {
         [version]$Version = "02.00.0000"
-        Write-Verbose "[BEGIN] Get-PKDadJoke v$Version"
+        $ScriptName = $MyInvocation.MyCommand.Name
+        Write-Verbose "[BEGIN: $ScriptName] Get dad jokes from icanhazdadjoke.com"
 
         function _FormatDadJoke {
             param([Parameter(ValueFromPipeline)][string]$Joke)
@@ -221,6 +213,6 @@ Function Get-PKDadJoke2 {
         }
     }
     End {
-        Write-Verbose "[END: $ScriptName]"
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 }

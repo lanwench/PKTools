@@ -2,23 +2,24 @@
 Function Get-PKTimeZones {
 <#
 .SYNOPSIS
-    Retrieves and displays information about system time zones using [System.TimeZoneInfo]::GetSystemTimeZones() 
+    Retrieves system time zones with UTC offset, DST support, and current local time
 
 .DESCRIPTION
-    Retrieves and displays information about system time zones using [System.TimeZoneInfo]::GetSystemTimeZones() 
-    The output can be customized to show either detailed or minimal information based on the '-Mini' parameter
+    Wraps [System.TimeZoneInfo]::GetSystemTimeZones() with formatted output and optional minimal view
+    Supports full output (ID, display name, offset, DST, current time) and compact -Mini mode
 
 .NOTES
     Name    : Function_Get-PKTimeZones.ps1
     Created : 2018-03-05
     Author  : Paula Kingsley
-    Version : 02.00.0000
+    Version : 02.01
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
-        
-        v01.00.0000 - 2018-03-05 - Created script
-        v02.00.0000 - 2025-04-24 - Rewritten because (cough) I learned a lot since 2018; and moved into PKTools module.
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+        v01.00 - 2018-03-05 - Created script
+        v02.00 - 2025-04-24 - Rewritten because (cough) I learned a lot since 2018; and moved into PKTools module
+        v02.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .PARAMETER Mini
     If specified, returns only minimal information, including the time zone ID and short/display offset.
@@ -96,15 +97,21 @@ Param(
 )
 Begin {
     # Current version (please keep up to date from comment block)
-    [version]$Version = "02.00.0000"
+    [version]$Version = "02.01"
+
+    # How did we get here
+    $ScriptName = $MyInvocation.MyCommand.Name
+    $Source = $PSCmdlet.ParameterSetName
+    [switch]$PipelineInput = $MyInvocation.ExpectingInput
 
     # Show our settings
-    $ScriptName = $MyInvocation.MyCommand.Name
     $CurrentParams = $PSBoundParameters
     $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} | 
         Where-Object {Test-Path variable:$_}| Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+    $CurrentParams.Add("ParameterSetName",$Source)
+    $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"

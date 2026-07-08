@@ -1,4 +1,4 @@
-﻿#requires -Version 3
+﻿#requires -Version 4
 Function Convert-PKIISLog {
 <#
 .SYNOPSIS
@@ -6,21 +6,27 @@ Function Convert-PKIISLog {
 
 .DESCRIPTION
     Parses an IIS log from a file (string or object) and returns a PSObject
-    Accepts pipeline input
-            
+    Accepts pipeline input as file paths or file objects
+    Validates that the file matches the IIS W3C Extended log format
+    Returns a collection of PSObjects with one property per log field
+
 .NOTES
     Name    : Function_Convert-PKIISLog.ps1
     Author  : Paula Kingsley
     Created : 2019-11-01
-    Version : 01.00.0000
-    History:
+    Version : 01.01
+    History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2019-11-01 - Created script based on Nathan Hartley's code (see link)
+        v01.00 - 2019-11-01 - Created script based on Nathan Hartley's code (see link)
+        v01.01 - 2026-06-16 - Cosmetic updates; converted version format to major.minor
 
 .LINK
     https://social.technet.microsoft.com/Forums/scriptcenter/en-US/46bc6859-d9e3-47c3-b1a6-5132281df18b/howto-use-powershell-to-parse-iis-logs-files
+
+.PARAMETER Logfile
+    One or more IIS logfile absolute paths or file objects
 
 .EXAMPLE
     PS C:\> $LogResults = Convert-PKIISLog -Logfile $File -Verbose
@@ -34,7 +40,7 @@ Function Convert-PKIISLog {
         Quiet         False                                                                                                      
         PipelineInput False                                                                                                      
         ScriptName    Convert-PKIISLog                                                                                           
-        ScriptVersion 1.0.0                                                                                                      
+        ScriptVersion 01.01
         BEGIN: Convert IIS log file to PSObject
 
         [20191101_MegacorpSMTP_ex191101.log] Verify file path
@@ -46,7 +52,7 @@ Function Convert-PKIISLog {
 
         END  : Convert IIS log file to PSObject
         
-        PS C:\> $LogResults | Select -First 3
+        PS C:\> $LogResults | Select-Object -First 3
 
         date            : 2019-11-01
         time            : 00:01:01
@@ -155,33 +161,26 @@ Param(
     )]
     [Alias("Name","FullName")]
     [ValidateNotNullOrEmpty()]
-    [object[]]$Logfile,
-
-    [Parameter(
-        HelpMessage = "Suppress all non-verbose console output"
-    )]
-    [Alias("SuppressconsoleOutput")]
-    [switch]$Quiet
-
+    [object[]]$Logfile
 )
 
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01"
 
     # How did we get here?
+    $ScriptName = $MyInvocation.MyCommand.Name
     $Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $CurrentParams = $PSBoundParameters
-    
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path Variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path Variable:$_} | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-    #$CurrentParams.Add("ParameterSetName",$Source)
+    $CurrentParams.Add("ParameterSetName",$Source)
     $CurrentParams.Add("PipelineInput",$PipelineInput)
-    $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
+    $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
@@ -191,34 +190,7 @@ Begin {
 
     #region Functions
 
-    # Function to write a console message or a verbose message
-    Function Write-MessageInfo {
-        Param([Parameter(ValueFromPipeline)]$Message,$FGColor,[switch]$Title)
-        $BGColor = $host.UI.RawUI.BackgroundColor
-        If (-not $Quiet.IsPresent) {
-            If ($Title.IsPresent) {$Message = "`n$Message`n"}
-            $Host.UI.WriteLine($FGColor,$BGColor,"$Message")
-        }
-        Else {Write-Verbose "$Message"}
-    }
-
-    # Function to write an error as a string (no stacktrace)
-    Function Write-MessageError {
-        [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message,[switch]$Force)
-        $Host.UI.WriteErrorLine("$Message")
-    }
-
-    #endregion Functions
-
     #region Splats
-
-    # General-purpose splat
-    $StdParams = @{}
-    $StdParams = @{
-        Verbose     = $False
-        ErrorAction = "Stop"
-    }
 
     # Splat for Write-Progress 
     $Activity = "Convert IIS log file to PSObject"
@@ -233,97 +205,85 @@ Begin {
     #endregion Splats
 
     # Console output
-    "BEGIN: $Activity" | Write-MessageInfo -FGColor Yellow -Title
+    Write-Verbose "[BEGIN: $ScriptName] $Activity"
 }
 Process {
 
     Foreach ($File in $Logfile) {
-        
         If ($File -is [string]) {}
         Elseif ($File -is [System.IO.FileInfo]){$File = $File.FullName}
-
         $Msg = "Verify file path"
-
         $Param_WP.Status = $File
         $Param_WP.CurrentOperation = $Msg
         Write-Progress @Param_WP
-        
         $FileName = $File | Split-Path -Leaf -ErrorAction Stop
-        "[$FileName] $Msg" | Write-MessageInfo -FGColor White
+        Write-Verbose "[$FileName] $Msg" 
 
         Try {
             $Null = Test-Path $File -PathType Leaf -ErrorAction Stop
             $Msg = "Verified file path"
-            "[$FileName] $Msg" | Write-MessageInfo -FGColor Green
+            Write-Verbose "[$FileName] $Msg"
 
             Try {
                 $Msg = "Get logfile content"
-                "[$FileName] $Msg" | Write-MessageInfo -FGColor White
-
+                Write-Verbose "[$FileName] $Msg"
                 $Param_WP.CurrentOperation = $Msg
                 Write-Progress @Param_WP
-
                 $FileContent = Get-Content -Path $File -ErrorAction Stop 
                 $Msg = "Successfuly got logfile content"
-                "[$FileName] $Msg" | Write-MessageInfo -FGColor Green
+                Write-Verbose "[$FileName] $Msg"
 
                 If ($FileContent -match "#Software: Microsoft Internet Information Services") {
-                    
                     $Total = ($FileContent -as [array]).Count
                     $Current = 0
-                    Try {
-                    
-                        $Msg = "Parse logfile content and output PSObject"
-                        "[$FileName] $Msg" | Write-MessageInfo -FGColor White
 
+                    Try {
+                        $Msg = "Parse logfile content and output PSObject"
+                        Write-Verbose "[$FileName] $Msg"
                         $Param_WP.CurrentOperation = $Msg
                         Write-Progress @Param_WP
 
                         $Output = $FileContent | Foreach-Object {
-                        
                             $Current ++
                             Write-Progress @Param_WP -PercentComplete ($Current/$Total*100)
-
                             $_ -replace '#Fields: ', ''
 
                         } | Where-Object {$_ -notmatch '^#'} | ConvertFrom-CSV -Delimiter ' '
                             
                         $Msg = "Successfully converted $Total logfile entries to a PSObject"
-                        "[$FileName] $Msg" | Write-MessageInfo -FGColor Green
+                        Write-Verbose "[$FileName] $Msg"
                         Write-Progress -Activity $Activity -Completed
                             
                         Write-Output $Output
-                
                     }
                     Catch {
                         $Msg = "Failed to parse content for file '$File'"
                         If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
-                        "[$FileName] $Msg" | Write-MessageError
+                        Write-Warning "[$FileName] $Msg"
                     }
                 } 
                 Else {
                     $Msg = "File '$File' does not appear to be an IIS logfile"
-                    "[$FileName] $Msg" | Write-MessageError
+                    Write-Warning "[$FileName] $Msg" 
                 }
             }
             Catch {
                 $Msg = "Failed to get content from file '$File'"
                 If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
-                "[$FileName] $Msg" | Write-MessageError
-           }
+                Write-Warning "[$FileName] $Msg" 
+            }
         }
         Catch {
             $Msg = "Failed to verify file path '$File'"
-            "[$FileName] $Msg" | Write-MessageError
+            Write-Warning "[$FileName] $Msg" 
         }
 
     } #end foreach 
-    
 }
 End {
     
     Write-Progress -Activity $Activity -Completed
-    "END  : $Activity" | Write-MessageInfo -FGColor Yellow -Title
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 
 }
 } #end Convert-PKIISLog

@@ -15,14 +15,16 @@ Function Convert-PKCollectionToString {
 
 .NOTES
     Name    : Function_Convert-PKCollectionToString.ps1
-    Created : 2027-10-25
+    Created : 2025-10-25
     Author  : Paula Kingsley
-    Version : 01.01.0000
+    Version : 01.02
     History :
-    
+
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2025-10-27 - Created script based mostly on Boe Prox's Convert-OutputForCSV
+        v01.00 - 2025-10-27 - Created script based mostly on Boe Prox's Convert-OutputForCSV
+        v01.01 - 2025-10-27 - Updates
+        v01.02 - 2026-06-16 - Cosmetic updates; converted version format to major.minor
 
 .PARAMETER InputObject
     The object from the pipeline to process
@@ -57,18 +59,20 @@ Param (
 
 Begin {
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.02"
     
     # Show our settings
     $ScriptName = $MyInvocation.MyCommand.Name
-    #$Source = $PSCmdlet.ParameterSetName
+    $Source = $PSCmdlet.ParameterSetName
+    [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $CurrentParams = $PSBoundParameters
 
-    $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } |
     Where-Object { Test-Path variable:$_ } | ForEach-Object {
         $CurrentParams.Add($_, (Get-Variable $_).value)
     }
-    #$CurrentParams.Add("ParameterSetName", $Source)
+    $CurrentParams.Add("ParameterSetName", $Source)
+    $CurrentParams.Add("PipelineInput", $PipelineInput)
     $CurrentParams.Add("ScriptName", $ScriptName)
     $CurrentParams.Add("ScriptVersion", $Version)
     Write-Verbose "PSBoundParameters: `n`t$(($CurrentParams.GetEnumerator() | Sort-Object) | Format-Table -AutoSize | out-string )"
@@ -121,6 +125,6 @@ Process {
 }
 
 End {
-    Write-Verbose "[END: $ScriptName] Finished processing"
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 }
 } # end Convert-PKCollectionToString

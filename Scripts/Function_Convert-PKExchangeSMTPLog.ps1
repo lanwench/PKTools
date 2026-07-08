@@ -1,23 +1,26 @@
-﻿#requires -Version 3
+﻿#requires -Version 4
 Function Convert-PKEXchangeSMTPLog {
 <#
 .SYNOPSIS
     Parses an Exchange send or receive connector log from a file (string or object) and returns a PSObject        
 
 .DESCRIPTION
-    Parses an Exchange send or receive connector log from a file (string or object) and returns a PSObject    
-    Accepts pipeline input
-            
+    Parses an Exchange send or receive connector log from a file (string or object) and returns a PSObject
+    Accepts pipeline input as file paths or file objects
+    Validates that the file matches the Exchange SMTP connector log format
+    Returns a collection of PSObjects representing parsed log entries with a DateTime column added
+
 .NOTES
     Name    : Function_Convert-PKExchangeSMTPLog.ps1
     Author  : Paula Kingsley
     Created : 2019-11-01
-    Version : 01.00.0000
-    History:
+    Version : 01.01
+    History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2019-11-01 - Created script based on Nathan Hartley's code (see link)
+        v01.00 - 2019-11-01 - Created script based on Nathan Hartley's code (see link)
+        v01.01 - 2026-06-16 - Cosmetic updates; converted version format to major.minor
 
 .LINK
     https://social.technet.microsoft.com/Forums/scriptcenter/en-US/46bc6859-d9e3-47c3-b1a6-5132281df18b/howto-use-powershell-to-parse-iis-logs-files
@@ -34,7 +37,7 @@ Function Convert-PKEXchangeSMTPLog {
         Quiet         False                                                                                                        
         PipelineInput False                                                                                                        
         ScriptName    Convert-PKEXchangeSMTPLog                                                                                    
-        ScriptVersion 1.0.0                                                                                                        
+        ScriptVersion 01.01
 
         BEGIN: Convert EXchange Send/Receive connector log file to PSObject
 
@@ -104,174 +107,121 @@ Param(
         HelpMessage = "Content of one or more Exchange send/receive connector logfiles"
     )]
     [ValidateNotNullOrEmpty()]
-    [object[]]$Log,
-
-    [Parameter(
-        HelpMessage = "Suppress all non-verbose console output"
-    )]
-    [Alias("SuppressconsoleOutput")]
-    [switch]$Quiet
+    [object[]]$Log
 
 )
 
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01"
 
     # How did we get here?
+    $ScriptName = $MyInvocation.MyCommand.Name
     $Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $CurrentParams = $PSBoundParameters
-    
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path Variable:$_}| Foreach {
+
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path Variable:$_} | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-    #$CurrentParams.Add("ParameterSetName",$Source)
+    $CurrentParams.Add("ParameterSetName",$Source)
     $CurrentParams.Add("PipelineInput",$PipelineInput)
-    $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
+    $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
-    # Preferences 
+    # Preferences
     $ErrorActionPreference = "Stop"
     $ProgressPreference = "Continue"
 
-    #region Functions
-
-    # Function to write a console message or a verbose message
-    Function Write-MessageInfo {
-        Param([Parameter(ValueFromPipeline)]$Message,$FGColor,[switch]$Title)
-        $BGColor = $host.UI.RawUI.BackgroundColor
-        If (-not $Quiet.IsPresent) {
-            If ($Title.IsPresent) {$Message = "`n$Message`n"}
-            $Host.UI.WriteLine($FGColor,$BGColor,"$Message")
-        }
-        Else {Write-Verbose "$Message"}
-    }
-
-    # Function to write an error as a string (no stacktrace)
-    Function Write-MessageError {
-        [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message,[switch]$Force)
-        $Host.UI.WriteErrorLine("$Message")
-    }
-
-    #endregion Functions
-
     #region Splats
 
-    # General-purpose splat
-    $StdParams = @{}
-    $StdParams = @{
-        Verbose     = $False
-        ErrorAction = "Stop"
-    }
-
-    # Splat for Write-Progress 
+    # Splat for Write-Progress
     $Activity = "Convert EXchange Send/Receive connector logfile to PSObject"
     $Param_WP = @{}
     $Param_WP = @{
         Activity         = $Activity
         CurrentOperation = $Null
-        #PercentComplete  = $Null
         Status           = "Working"
     }
 
     #endregion Splats
 
     # Console output
-    "BEGIN: $Activity" | Write-MessageInfo -FGColor Yellow -Title
+    Write-Verbose "[BEGIN: $ScriptName] $Activity"
 }
 Process {
 
     Foreach ($File in $Logfile) {
-        
         If ($File -is [string]) {}
         Elseif ($File -is [System.IO.FileInfo]){$File = $File.FullName}
-
         $Msg = "Verify file path"
-
         $Param_WP.Status = $File
         $Param_WP.CurrentOperation = $Msg
         Write-Progress @Param_WP
-        
         $FileName = $File | Split-Path -Leaf -ErrorAction Stop
-        "[$FileName] $Msg" | Write-MessageInfo -FGColor White
+        Write-Verbose "[$FileName] $Msg" 
 
         Try {
             $Null = Test-Path $File -PathType Leaf -ErrorAction Stop
             $Msg = "Verified file path"
-            "[$FileName] $Msg" | Write-MessageInfo -FGColor Green
+            Write-Verbose "[$FileName] $Msg"
 
             Try {
                 $Msg = "Get logfile content"
-                "[$FileName] $Msg" | Write-MessageInfo -FGColor White
-
+                Write-Verbose "[$FileName] $Msg"
                 $Param_WP.CurrentOperation = $Msg
                 Write-Progress @Param_WP
-
                 $FileContent = Get-Content -Path $File -ErrorAction Stop 
                 $Msg = "Successfuly got logfile content"
-                "[$FileName] $Msg" | Write-MessageInfo -FGColor Green
+                Write-Verbose "[$FileName] $Msg"
 
                 If ($FileContent -match "#Software: Microsoft Exchange Server" -and $FileContent -match "#Log-type: SMTP") {
-                    
                     $Total = ($FileContent -as [array]).Count
-                    $Current = 0
-                    Try {
-                    
-                        $Msg = "Parse logfile content and output PSObject"
-                        "[$FileName] $Msg" | Write-MessageInfo -FGColor White
 
+                    Try {
+                        $Msg = "Parse logfile content and output PSObject"
+                        Write-Verbose "[$FileName] $Msg"
                         $Param_WP.CurrentOperation = $Msg
                         Write-Progress @Param_WP
-
-                        #$Fields = (($FileContent | where {$_ -match "#Fields"}) -split ":")[1].trim() -split ","
                         $Header = ((($FileContent | Select-String "#Fields:") -Split ":")[1]).Trim() -Split ","
-
                         $Output = ($Filecontent | Select-String -Pattern "#" -NotMatch) | 
                             ConvertFrom-CSV -Header $Header | Select-Object * ,
                                 @{Name="DateTime";Expression = {$_.'date-time' -as [datetime]}} | 
-                                    Select * -ExcludeProperty Date-Time
-    
+                                    Select-Object * -ExcludeProperty Date-Time
                         $Msg = "Successfully converted $Total logfile entries to a PSObject"
-                        "[$FileName] $Msg" | Write-MessageInfo -FGColor Green
+                        Write-Verbose "[$FileName] $Msg"
                         Write-Progress -Activity $Activity -Completed
-                            
-                        Write-Output $Output #| Select-Object * ,@{Name="DateTime";Expression = {$_.'date-time' -as [datetime]}} | Select * -ExcludeProperty Date-Time
-                
+                        Write-Output $Output 
                     }
                     Catch {
                         $Msg = "Failed to parse content for file '$File'"
                         If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
-                        "[$FileName] $Msg" | Write-MessageError
+                        Write-Warning "[$FileName] $Msg"
                     }
                 } 
                 Else {
                     $Msg = "File '$File' does not appear to be an Exchange send/receive connector SMTP logfile"
-                    "[$FileName] $Msg" | Write-MessageError
+                    Write-Warning "[$FileName] $Msg"
                 }
             }
             Catch {
                 $Msg = "Failed to get content from file '$File'"
                 If ($ErrorDetails = $_.Exception.Message) {$Msg += " ($ErrorDetails)"}
-                "[$FileName] $Msg" | Write-MessageError
-           }
+                Write-Warning "[$FileName] $Msg"
+            }
         }
         Catch {
             $Msg = "Failed to verify file path '$File'"
-            "[$FileName] $Msg" | Write-MessageError
+            Write-Warning "[$FileName] $Msg"
         }
-
-    } #end foreach 
-    
+    } #end foreach    
 }
 End {
-    
     Write-Progress -Activity $Activity -Completed
-    "END  : $Activity" | Write-MessageInfo -FGColor Yellow -Title
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 
 }
 } #end Convert-PKIISLog

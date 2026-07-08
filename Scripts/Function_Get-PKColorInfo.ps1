@@ -6,24 +6,22 @@ Function Get-PKColorInfo {
     Look up color information by Hex code or Name with ANSI color examples, via REST API (default) or local query.
 
 .DESCRIPTION
-    Look up color information by Hex code or Name with ANSI color examples, via REST API (default) or local query.
-    - Hex Codes: No '#' required. Just type the 3 or 6 digit code. (Asterisks not allowed).
-    - Names: 
-        - Exact match required by default (e.g., "Blue").
-        - Use '*' for wildcard matching (e.g., "Dark*"). 
-        - If wildcard returns multiple matches, a selection menu appears unless -DisplayAll is used.
-    - Output: Returns a rich object with ANSI color preview.
+    Accepts Hex codes (no # prefix needed) or color names with optional wildcard matching
+    Uses a REST API for color lookups (default) or local System.Drawing color database (-LocalLookup)
+    When a wildcard name returns multiple results, shows a selection menu unless -DisplayAll is specified
+    Returns an object with ANSI color preview, RGB values, and Hex code
 
 .NOTES
     Name    : Function_Get-PKColorInfo.ps1
     Author  : Paula Kingsley
     Created : 2026-01-08
-    Version : 01.00.0000    
+    Version : 01.01
     History :
 
-        *** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2026-01-08 - Created script
+        v01.00 - 2026-01-08 - Created script
+        v01.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .PARAMETER InputValue
     One or more color identifiers as Hex codes or color names. Accepts pipeline input.
@@ -131,18 +129,20 @@ Function Get-PKColorInfo {
     Begin {
         
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.00.0000"
+        [version]$Version = "01.01"
 
         # Show our settings
         $ScriptName = $MyInvocation.MyCommand.Name
-        $CurrentParams = $PSBoundParameters
+        $Source = $PSCmdlet.ParameterSetName
         [switch]$PipelineInput = $MyInvocation.ExpectingInput
-        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
+        $CurrentParams = $PSBoundParameters
+        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } |
         Where-Object { Test-Path variable:$_ } | Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-        $CurrentParams.Add("ScriptName", $ScriptName)
+        $CurrentParams.Add("ParameterSetName", $Source)
         $CurrentParams.Add("PipelineInput", $PipelineInput)
+        $CurrentParams.Add("ScriptName", $ScriptName)
         $CurrentParams.Add("ScriptVersion", $Version)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
@@ -326,10 +326,6 @@ Function Get-PKColorInfo {
         } 
     }
 End {
-    Write-Verbose "[END: $ScriptName] Operation complete"
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 }    
 } # end Get-PKColorInfo
-
-
-
-Get-PKColorInfo -Color dark*green -DisplayAllMatches -LocalLookup -Large

@@ -1,42 +1,33 @@
 #requires -version 4
 Function Backup-PKVSCodeData {
     <#
-.SYNOPSIS 
-    Backs up the user \Data folder for VSCode to a date-named compressed file in the target path of your choice
+.SYNOPSIS
+    Backs up the VSCode \Data folder to a date-stamped zip file
 
 .DESCRIPTION
-    Backs up the user \Data folder for VSCode to a date-named compressed file in the target path of your choice
+    Backs up the VSCode \Data folder to a date-stamped zip file in the specified target path
+    Attempts to locate code.exe automatically if -VSCodePath is not specified
+    Prevents execution if called from within VSCode itself
+    Supports -WhatIf and -Confirm (ShouldProcess)
+    Returns the output zip file object
 
 .NOTES
     Name    : Function_Backup-PKVSCodeData.ps1
     Created : 2025-01-31
     Author  : Paula Kingsley
-    Version : 01.0.0000
+    Version : 01.01
     History :
-    
+
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2025-01-31 - Created script
-        
-.PARAMETER TargetPath
-    Target folder for VSCode Portable (default is $Home\VSCode)
+        v01.00 - 2025-01-31 - Created script
+        v01.01 - 2026-06-16 - Cosmetic updates; converted version format to major.minor
 
-.PARAMETER URI
-    URI for portable VSCode zip file download; change at your peril!
+.PARAMETER VSCodePath
+    Path to VSCode installation folder; if not specified, attempts to locate code.exe in the current path
 
-.PARAMETER ForceUpdate
-    Update current installation even if no newer version was found
-
-.PARAMETER KillRunningProcess
-    Stop any running VSCode Portable process in the specified path (requires elevation)
-
-.EXAMPLE 
-    PS C:\> Install-PKVSCodePortable -Verbose
-    Downloads and installs or updates VSCode Portable in C:\VSCode
-
-.EXAMPLE 
-    PS C:\> Install-PKVSCodePortable -TargetPath "C:\MyPath" -URI "https://this.seems-like-a-dodgy-path.right" -Verbose
-    Downloads and installs or updates VSCode Portable in a non-default path from a non-default URI
+.PARAMETER BackupPath
+    Target folder for backup zip file (default is user temp directory)
 
 #>
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = "High")]
@@ -59,14 +50,14 @@ Function Backup-PKVSCodeData {
     Begin {
 
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.00.0000"
+        [version]$Version = "01.01"
 
         # How did we get here?
         [switch]$PipelineInput = $MyInvocation.ExpectingInput
         $Source = $PSCmdlet.ParameterSetName
+        $ScriptName = $MyInvocation.MyCommand.Name
 
         $CurrentParams = $PSBoundParameters
-        $ScriptName = $MyInvocation.MyCommand.Name
         $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
         Where-Object { Test-Path Variable:$_ } | Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
@@ -78,11 +69,10 @@ Function Backup-PKVSCodeData {
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
         $Activity = "Back up VSCode \Data folder to $BackupPath"
-        Write-Verbose "[BEGIN: $ScriptName] $Activity"
 
         # Make sure files aren't in use!
         If ($Host.Name -match "Visual Studio") {
-            $Msg = "Sorry, you can't run this from *inside* Visual Studio Code! Please close it and try again from a regular pwsh shell." 
+            $Msg = "Sorry, you can't run this from *inside* Visual Studio Code! Please close it and try again from a regular pwsh shell."
             Write-Warning $Msg
             Break
         }
@@ -109,13 +99,14 @@ Function Backup-PKVSCodeData {
         }
 
         # Create the filename
-        $BackupFile = "$BackupPath\VSCodeBackup-$((Get-Date).ToString('yyyyMMdd-HHmmss')).zip"       
+        $BackupFile = "$BackupPath\VSCodeBackup-$((Get-Date).ToString('yyyyMMdd-HHmmss')).zip"
+
+        Write-Verbose "[BEGIN: $ScriptName] $Activity"
 
     } #end begin
 
     Process {
 
-        
         Try {
             $Msg = "Get data subfolder"
             Write-Verbose "[$VSCodePath] $Msg"
@@ -359,7 +350,7 @@ Function Backup-PKVSCodeData {
     End {
         Write-Progress -Activity * -Completed 
         $Stopwatch.Stop()
-        Write-Verbose "[END $ScriptName]"
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 } #end Backup-VSCodeData
 

@@ -1,27 +1,27 @@
 
 #requires -Version 4
-function Get-PKWeather {
+Function Get-PKWeather {
 <#
 .SYNOPSIS
     Retrieves current weather conditions for a specified location using the OpenWeatherMap API.
 
 .DESCRIPTION
-    The 'Get-PKWeather' function fetches weather data from OpenWeatherMap API 2.5 for a given location. 
-    This was written mainly as a learning exercise to understand how to use the OpenWeatherMap API and PowerShell's Invoke-WebRequest cmdlet.
-    It supports fetching weather information by postal code and country, or by using the current computer's geographic location 
-    The function uses the OpenWeatherMap API to retrieve weather details such as temperature, humidity, wind speed, and more.
-    The optional -GetForecast parameter allows for retrieving a 3-day weather forecast with the selection of the time of day for the forecast.
+    Fetches weather conditions from OpenWeatherMap API 2.5 by postal code and country, or using the computer's geolocation
+    Requires a free OpenWeatherMap API token; a test token is used if none is specified
+    The -GetForecast switch retrieves a 3-day forecast with configurable time-of-day selection
+    Returns temperature, humidity, wind speed, and other weather data as a PSObject
 
 .NOTES
     Name    : Function_Get-PKWeather.ps1
     Created : 2025-04-24
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
-        
-        v01.00.0000 - 2025-04-24 - Created script
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+        v01.00 - 2025-04-24 - Created script
+        v01.01 - 2026-06-17 - Cosmetic updates; Pascal case fix; converted version format to major.minor
 
 .PARAMETER Country
     Specifies the 2-character country code/abbreviation when not using auto-discover for location; if -Postcode is not provided, uses the default location or capital
@@ -179,7 +179,7 @@ param (
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01"
 
     # How did we get here
     $Source = $PSCmdlet.ParameterSetName
@@ -347,7 +347,7 @@ Begin {
         Write-Verbose $Msg
         Try {
             $CountryURI = "https://www.apicountries.com/countries"
-            $AllCountries  = Invoke-webrequest -uri $CountryURI -ErrorAction Stop -Verbose:$False -ProgressAction SilentlyContinue
+            $AllCountries  = Invoke-WebRequest -Uri $CountryURI -ErrorAction Stop -Verbose:$False -ProgressAction SilentlyContinue
             $LookupTable = $AllCountries.Content | ConvertFrom-JSON -ErrorAction Stop | Select-Object Name,Capital,Region,Alpha2Code,Alpha3Code,LatLng | Sort-Object Name
             If (-not ($CountryLookup = $LookupTable | Where-Object { $_.Alpha2Code -eq $Country.ToUpper() -or $_.Alpha3Code -eq $Country.ToUpper() } | Select-Object -First 1)) {
                 $Msg = "Invalid country code '$($Country.ToUpper())' - please provide a valid two-character ISO-3166 country code"
@@ -810,4 +810,8 @@ Process {
         Write-Error $Msg  
     }
 } #end process
+
+End {
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
+}
 } # end Get-PKWeather

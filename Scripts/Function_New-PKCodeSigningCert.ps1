@@ -1,26 +1,28 @@
 ﻿#Requires -version 4
-function New-PKCodeSigningCert {
+Function New-PKCodeSigningCert {
 <#
 .SYNOPSIS
     Creates a new self-signed certificate on the local computer in the current user's certificate store
 
 .DESCRIPTION
-    Creates a new self-signed certificate on the local computer in the current user's certificate store
-    Checks for existing certificate and exits if true
+    Checks for an existing code-signing certificate before proceeding
+    Creates a self-signed code-signing certificate in the current user's certificate store
     Supports ShouldProcess
-    Returns a string
+    Returns the certificate object
+    Windows only
 
 .NOTES
-    Name    : Function_New-PKCodeSigningCert.ps1 
+    Name    : Function_New-PKCodeSigningCert.ps1
     Created : 2019-05-08
     Author  : Paula Kingsley
-    Version : 01.01.0000
+    Version : 01.02
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK ** 
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2019-05-08 - Created script based on Tobias Weltner's original
-        v01.01.0000 - 2022-10-18 - Minor updates
+        v01.00 - 2019-05-08 - Created script based on Tobias Weltner's original
+        v01.01 - 2022-10-18 - Minor updates
+        v01.02 - 2026-06-17 - Cosmetic updates; Pascal case fix; converted version format to major.minor
 
 .LINK
     https://community.idera.com/database-tools/powershell/powertips/b/tips/posts/creating-code-signing-certificates
@@ -165,17 +167,19 @@ param (
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.01.0000"
+    [version]$Version = "01.02"
 
     # Show our settings
     $ScriptName = $MyInvocation.MyCommand.Name
+    $Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
 
     $CurrentParams = $PSBoundParameters
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path variable:$_} | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+    $CurrentParams.Add("ParameterSetName",$Source)
     $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
@@ -183,7 +187,7 @@ Begin {
     
     #region Verify OS version
 
-    If (-not ($Null = [Environment]::OSVersion.Version -ge (new-object 'Version' 10,0))) {
+    If (-not ($Null = [Environment]::OSVersion.Version -ge (New-Object 'Version' 10,0))) {
         $Msg = "This script requires Windows 10 or Windows Server 2016 at minimum; you are running $((Get-WMIObject -ClassName Win32_OperatingSystem -Property Caption).Caption)"
         Throw $Msg
     }

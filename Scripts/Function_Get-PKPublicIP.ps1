@@ -5,22 +5,22 @@ Function Get-PKPublicIP {<#
     Retrieves the public IP address of the machine via an API call to the ifconfig.me service
 
 .DESCRIPTION
-    Retrieves the public IP address of the machine via Invoke-WebRequest to 'https://ifconfig.me/ip'
-    It returns the IP address as a trimmed string
+    Makes a web request to https://ifconfig.me/ip to get the current public IPv4 address
+    Also calls http://ip-api.com/json for ISP, city, region, and timezone metadata
+    Returns a PSObject with IPAddress, ISP, City, Region, Coordinates, and TimeZone properties
 
 .NOTES
     Name    : Function_Get-PKPublicIP.ps1
     Created : 2025-04-28
     Author  : Paula Kingsley
-    Version : 02.00.0000
+    Version : 02.01
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
-        
-        v01.00.0000 - 2025-04-28 - Created script
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-.LINK
-    https://www.powershellgallery.com/packages/WinTZ/0.1.0/Content/Public%5CGet-IANATimeZone.ps1        
+        v01.00 - 2025-04-28 - Created script
+        v02.00 - 2025-04-28 - Added ISP/location metadata via ip-api.com
+        v02.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .EXAMPLE
     PS C:\> Get-PKPublicIP -Verbose
@@ -31,7 +31,7 @@ Function Get-PKPublicIP {<#
         ---           -----
         Verbose       True
         ScriptName    Get-PKPublicIP
-        ScriptVersion 1.0.0
+        ScriptVersion 02.01
 
         VERBOSE: Getting public IP address from 'https://ifconfig.me/ip' and ISP details from 'http://ip-api.com/json'
                                                                                                                                 
@@ -48,23 +48,26 @@ Function Get-PKPublicIP {<#
     Param()
     Begin {
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.0.0000"
+        [version]$Version = "02.01"
 
         # How did we get here
         $ScriptName = $MyInvocation.MyCommand.Name
+        $Source = $PSCmdlet.ParameterSetName
+        [switch]$PipelineInput = $MyInvocation.ExpectingInput
 
         # Show our settings
         $CurrentParams = $PSBoundParameters
-        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
-        Where-Object { Test-Path variable:$_ } | Foreach-Object {
+        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } |
+        Where-Object { Test-Path variable:$_ } | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-        #$CurrentParams.Add("PipelineInput", $PipelineInput)
-        #$CurrentParams.Add("ParameterSetName", $Source)
+        $CurrentParams.Add("PipelineInput", $PipelineInput)
+        $CurrentParams.Add("ParameterSetName", $Source)
         $CurrentParams.Add("ScriptName", $ScriptName)
         $CurrentParams.Add("ScriptVersion", $Version)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
+        Write-Verbose "[BEGIN: $ScriptName] Get public IP address and ISP metadata"
     }
     Process {
         Try {
@@ -88,5 +91,8 @@ Function Get-PKPublicIP {<#
             $Msg = "Operation failed! $($_.Exception.Message)"
             Write-Error $Msg
         }
+    }
+    End {
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 } #end Get-PKPublicIP

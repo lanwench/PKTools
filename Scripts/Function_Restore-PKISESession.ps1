@@ -1,26 +1,29 @@
 ﻿#requires -Version 4
 Function Restore-PKISESession {
 <#
-.SYNOPSIS 
-    Restores tabs/files from text file created using Save-PKISESession
+.SYNOPSIS
+    Restores open ISE tabs from a session file created by Save-PKISESession
 
 .DESCRIPTION
-    Restores tabs/files from text file created using Save-PKISESession
-    Works only in ISE, because of course it does
+    Opens the file paths stored in a session file as new tabs in the PowerShell ISE
+    Works only in the PowerShell ISE host — kept for legacy use as ISE has been retired in favor of VS Code
+    Use Save-PKISESession to create the session file
+    Windows only
     
 .NOTES
     Name    : Function_Restore-PKISESession.ps1
     Created : 2016-05-29
     Author  : Paula Kingsley
-    Version : 03.00.0000
+    Version : 03.01
     History :
     
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2016-05-29 - Created script based on links
-        v02.00.0000 - 2018-02-14 - Updated/made consistent with new Save-PKISESession
-        v02.01.0000 - 2019-10-08 - Minor cosmetic updates
-        v03.00.0000 - 2022-10-10 - Mainly cosmetic updates/standardization
+        v01.00 - 2016-05-29 - Created script based on links
+        v02.00 - 2018-02-14 - Updated/made consistent with new Save-PKISESession
+        v02.01 - 2019-10-08 - Minor cosmetic updates
+        v03.00 - 2022-10-10 - Mainly cosmetic updates/standardization
+        v03.01 - 2026-06-16 - Cosmetic changes and removed semantic versioning
         
 .LINK
     https://itfordummies.net/2014/10/27/save-restore-powershell-ise-opened-scripts/
@@ -40,7 +43,7 @@ Function Restore-PKISESession {
         Delimiter     |                                 
         ScriptName    Restore-PKISESession              
         ScriptFile                                      
-        ScriptVersion 3.0.0                             
+        ScriptVersion 3.1                            
 
         VERBOSE: [BEGIN:] Restore-PKISESession Restore ISE session tabs from file
         VERBOSE: [C:\Users\kipa7003\PSISESession.txt] Getting file object
@@ -59,10 +62,12 @@ Function Restore-PKISESession {
         
         VERBOSE: [C:\Users\kipa7003\PSISESession.txt] Importing 7 saved tab(s) from file
 
-
+PS > Restore-PKISESession
+        Exception: /Users/paula/git/GitHub/PKTools/Scripts/Function_Restore-PKISESession.ps1:110:9
+        Line |
+        110 |          Throw $Msg
+            | This script requires the PowerShell ISE; current  host is 'Visual Studio Code Host'
             
-
-
 #>
 [CmdletBinding(
     SupportsShouldProcess = $True,
@@ -83,37 +88,43 @@ Param(
     )]
     [ValidateNotNullOrEmpty()]
     [string]$Delimiter = "|"
-
-
 )
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "03.00.0000"
+    [version]$Version = "03.01"
 
-   # How did we get here
+    # How did we get here
     $ScriptName = $MyInvocation.MyCommand.Name
+    $Source = $PSCmdlet.ParameterSetName
+    [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $CurrentParams = $PSBoundParameters
-    $ScriptName = $MyInvocation.MyCommand.Name
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path Variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path Variable:$_}| ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+    $CurrentParams.Add("ParameterSetName",$Source)
+    $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptFile",$ScriptFile)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
-   
+
+    If ($IsWindows -eq $False) {
+        $Msg = "This function requires Windows"
+        Write-Error $Msg
+        Return
+    }
+
     # Make sure we're using the ISE
     If ($Host.Name -ne "Windows PowerShell ISE Host") {
         $Msg = "This script requires the PowerShell ISE; current  host is '$($Host.Name)'"
         Throw $Msg
-        Break
     }
     
     # Function to test file type
     Function TestFileType {
-        [Cmdletbinding()]
+        [CmdletBinding()]
         Param([Parameter(ValueFromPipeline,Position=0)]$Item)
         If ([byte[]]$bytes = Get-Content -Encoding byte -ReadCount 4 -TotalCount 4 -Path $FileObj.FullName -ErrorAction SilentlyContinue){
             Switch -regex ('{0:x2}{1:x2}{2:x2}{3:x2}' -f $bytes[0],$bytes[1],$bytes[2],$bytes[3]) {
@@ -131,7 +142,7 @@ Begin {
     }
 
     $Activity = "Restore ISE session tabs from file"
-    Write-Verbose "[BEGIN:] $ScriptName $Activity"
+    Write-Verbose "[BEGIN: $ScriptName] $Activity"
 }
 Process{
     
@@ -211,6 +222,9 @@ Process{
         Write-Warning "[$SessionFile] $Msg"
     }
 
+}
+End {
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 }
 } #end Restore-PKISESession
 

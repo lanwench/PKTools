@@ -2,28 +2,26 @@
 Function Test-PKLdapSSLConnection {
 <#
 .SYNOPSIS
-    Tests an LDAPS connection, returning information about the negotiated SSL connection including the server certificate.
+    Tests an LDAPS connection and returns SSL parameters and the server certificate
 
 .DESCRIPTION
-    Test an LDAP connection, returning information about the negotiated SSL connection including the server certificate
-    Permits credentials
-    Defaults to port 636
-    The state message "The LDAP server is unavailable" indicates the server is either offline or unwilling to negotiate an SSL connection
+    Establishes an LDAPS connection and reports the negotiated SSL parameters and server X.509 certificate
+    Returns protocol, cipher, hash, key exchange algorithm, cipher and exchange strength, and the server certificate
+    Accepts pipeline input; defaults to port 636; supports alternate credentials
+    The "LDAP server is unavailable" state message indicates the server is offline or not accepting SSL connections
 
 .NOTES
-    .NOTES
     Name    : Function_Test-PKLdapSslConnection.ps1
     Created : 2020-09-15
     Author  : Paula Kingsley
-    Version : 01.01.0000
+    Version : 01.02
     History :
-        
+
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
-        
-        2020-09-15 - v01.00.0000 - Forked by Paula from Chris Dent's original, adding Wintelrob's comments from original gist that correct enumeration 
-                                   errors in output object when converting $Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm
-                                   Made computername mandatory, added begin block, changed and added other stuff 
-        2022-10-18 - v01.01.0000 - Updates, cleanup, added more comments
+
+        v01.00 - 2020-09-15 - Forked from Chris Dent's original; added Wintelrob's fix for KeyExchangeAlgorithm enumeration errors; added Begin block and other changes
+        v01.01 - 2022-10-18 - Updates, cleanup, added more comments
+        v01.02 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .INPUTS
     System.String
@@ -67,24 +65,24 @@ Function Test-PKLdapSSLConnection {
         HashStrength         : 0
         KeyExchangeAlgorithm : 44550 (ECDH_Ephem)
         ExchangeStrength     : 256
-        X509Certificate      : [Subject]
-                                 CN=ldaps-test.domain.local, O="Test Co", OU=Security, L=San Francisco, S=California, C=US
-                       
-                               [Issuer]
-                                 CN=GlobalSign RSA OV SSL CA 2018, O=GlobalSign nv-sa, C=BE
-                       
-                               [Serial Number]
-                                 0B810839C3C25D7rr61EC25E
-                       
-                               [Not Before]
-                                 2020-09-15 12:16:08 PM
-                       
-                               [Not After]
-                                 2021-10-17 12:16:08 PM
-                       
-                               [Thumbprint]
-                                 FB3E093D97BE601E1BD4228B984ADF6E6123BBC2
-                                 
+        X509Certificate      :  [Subject]
+                                CN=ldaps-test.domain.local, O="Test Co", OU=Security, L=San Francisco, S=California, C=US
+
+                                [Issuer]
+                                CN=GlobalSign RSA OV SSL CA 2018, O=GlobalSign nv-sa, C=BE
+
+                                [Serial Number]
+                                0B810839C3C25D7rr61EC25E
+
+                                [Not Before]
+                                2020-09-15 12:16:08 PM
+
+                                [Not After]
+                                2021-10-17 12:16:08 PM
+
+                                [Thumbprint]
+                                FB3E093D97BE601E1BD4228B984ADF6E6123BBC2
+
 #>
 
 [CmdletBinding()]
@@ -116,7 +114,7 @@ Param (
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.01.0000"
+    [version]$Version = "01.02"
 
     # How did we get here
     $ScriptName = $MyInvocation.MyCommand.Name
@@ -125,8 +123,8 @@ Begin {
     # Display our parameters
     $CurrentParams = $PSBoundParameters
     
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path variable:$_} | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
     $CurrentParams.Add("ParameterSetName",$Source)
@@ -140,7 +138,7 @@ Begin {
     Write-Verbose $Msg
 
 }
-process {
+Process {
     
     $Total = $Name.Count
     $Current = 0
@@ -247,7 +245,6 @@ process {
             CipherStrength       = $Connection.SessionOptions.SslInformation.CipherStrength
             Hash                 = $Connection.SessionOptions.SslInformation.Hash
             HashStrength         = $Connection.SessionOptions.SslInformation.HashStrength
-            #KeyExchangeAlgorithm = [Security.Authentication.ExchangeAlgorithmType][Int]$Connection.SessionOptions.SslInformation.KeyExchangeAlgorithm
             KeyExchangeAlgorithm = $KeyExchangeAlgo
             ExchangeStrength     = $Connection.SessionOptions.SslInformation.ExchangeStrength
             X509Certificate      = $Script:LdapCertificate
@@ -261,13 +258,9 @@ process {
         Catch {}
     
     } #end foreach
-
 }
 End {
-    
     Write-Progress -Activity * -Completed
-    $Msg = "END: $Scriptname] $Activity" 
-    Write-Verbose $Msg
-
+    Write-Verbose "[END: $Scriptname] Script ran successfully" 
 }
 } # End Test-PKLDAPSSLConnection

@@ -11,17 +11,19 @@ Function Get-PKFileReport {
         - Detailed information for each file, such as name, type, full path, creation and modification dates, and optionally, the owner
         - Interactive, sortable tables with custom branding and color schemes
     Launches the report in the default web browser unless specified otherwise
+    Windows only
 
 .NOTES
     Name    : Function_Get-PKFileReport.ps1
     Author  : Paula Kingsley
     Created : 2025-09-30
-    Version : 01.00.0000 
+    Version : 01.01
     History :
 
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2025-09-30 - Created script
+        v01.00 - 2025-09-30 - Created script
+        v01.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .PARAMETER Path
     The path to the folder or file to report on. Accepts pipeline input. Defaults to the current directory. Validates that the path exists.
@@ -93,23 +95,31 @@ Param (
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01"
 
     $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
     # Show our settings
     $ScriptName = $MyInvocation.MyCommand.Name
+    $Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $CurrentParams = $PSBoundParameters
-    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} | 
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
         Where-Object {Test-Path variable:$_}| Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+    $CurrentParams.Add("ParameterSetName",$Source)
     $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
-    
+
+    If ($IsWindows -eq $False) {
+        $Msg = "This function requires Windows"
+        Write-Error $Msg
+        Return
+    }
+
     #region Validate input; if it's already a file object, do nothing
     If (-not $PipelineInput -and ($Path -is [string])) {
         $Path = Get-Item -Path $Path -ErrorAction Stop
@@ -528,7 +538,7 @@ $TableFragment
 
     # We're done here
     $Stopwatch.Stop()
-    Write-Verbose "[END: $ScriptName] Processing completed in $($Stopwatch.Elapsed.TotalSeconds) seconds."
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 }
 } # end function
 

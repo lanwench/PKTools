@@ -1,5 +1,5 @@
 #requires -version 5
-function New-PKComplexPassword {
+Function New-PKComplexPassword {
     <#
 .SYNOPSIS
     Uses Get-Random and defined character sets to generate a password between 10 and 265 characters, with option to return secure string or plain text
@@ -9,16 +9,17 @@ function New-PKComplexPassword {
     Will include mixed case alpha and no more (or less) than 2 special characters
     Returns a string or securestring object
     
-.NOTES        
+.NOTES
     Name    : Function_New-PKComplexPassword.ps1
     Created : 2024-03-12
     Author  : Paula Kingsley
-    Version : 01.00.1000
+    Version : 01.01
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
-        
-        v01.00.0000 - 2024-03-12 - Created to replace New-PKRandomPassword, based on Yann Normand's original (see link)
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+        v01.00 - 2024-03-12 - Created to replace New-PKRandomPassword, based on Yann Normand's original (see link)
+        v01.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 
 .PARAMETER Length
@@ -120,7 +121,7 @@ function New-PKComplexPassword {
     Begin {
 
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.00.0000"
+        [version]$Version = "01.01"
 
         # Show our settings
         $ScriptName = $MyInvocation.MyCommand.Name

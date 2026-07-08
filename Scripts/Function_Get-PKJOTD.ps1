@@ -5,28 +5,28 @@ Function Get-PKJOTD {
     Retrieves jokes from the v2.jokeapi.dev API based on specified parameters
 
 .DESCRIPTION
-    The Get-PKJOTD function retrieves jokes from the Joke API based on the specified parameters
-    It allows you to specify categories, the number of jokes to return, the style of jokes (two-part, one-liner, or any), and whether to include NSFW (Not Safe for Work) content
-    Responses are converted to UTF8 and returned as a PSCustomObject
-    This was created as a way to have a little fun with a free API endpoint
-    NOTE: It will always filter out the categories 'racist' and 'sexist' but this is no guarantee, so use at your own risk!
+    Calls the v2.jokeapi.dev API with configurable category, count, and joke style
+    Always filters out racist and sexist categories; optionally includes other NSFW content
+    Returns a PSCustomObject per joke with setup/delivery or single-line content
+    Note: Even with filters, external API content is not guaranteed to be appropriate; use at your own risk
 
 .NOTES
     Name    : Function_Get-PKJOTD.ps1
     Created : 2024-04-03
     Author  : Paula Kingsley
-    Version : 02.00.0000
+    Version : 02.01
     History :
-    
+
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2024-04-03 - Created script
-        v02.00.0000 - 2025-12-29 - Fixes issue with URI, simplified output/removed inner function
+        v01.00 - 2024-04-03 - Created script
+        v02.00 - 2025-12-29 - Fixes issue with URI, simplified output/removed inner function
+        v02.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor, fixed regex for 2part
 
 .OUTPUTS
     PSCustomObject        
 
-.PARAMETER categories
+.PARAMETER Categories
     Specifies the categories to search for. By default, it searches for jokes with categories "Programming" and "Miscellaneous".
 
 .PARAMETER Count
@@ -73,42 +73,31 @@ Function Get-PKJOTD {
     )
     Begin {
         # Current version (please keep up to date from comment block)
-        [version]$Version = "02.00.0000"
+        [version]$Version = "02.01"
 
         # How did we get here?
+        $ScriptName = $MyInvocation.MyCommand.Name
+        $Source = $PSCmdlet.ParameterSetName
         [switch]$PipelineInput = $MyInvocation.ExpectingInput
         $CurrentParams = $PSBoundParameters
         #If (-not $CurrentParams.Type) {$Type = $CurrentParams.Type = "TwoPart"}
-        $ScriptName = $MyInvocation.MyCommand.Name
-        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
+        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } |
         Where-Object { Test-Path Variable:$_ } | Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+        $CurrentParams.Add("ParameterSetName", $Source)
+        $CurrentParams.Add("PipelineInput", $PipelineInput)
         $CurrentParams.Add("ScriptName", $ScriptName)
         $CurrentParams.Add("ScriptVersion", $Version)
-        $CurrentParams.Add("PipelineInput", $PipelineInput)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
         
-        
-        #region Build URI string        
-        <#
-        If (-not $Categories) {$URI = "https://v2.jokeapi.dev/joke/Programming,Miscellaneous"}
-        Else {$URI = "https://v2.jokeapi.dev/joke/$($Categories -join(","))"}
-        If ($IncludeNFSW.IsPresent) {$URI += "?blacklistFlags=nsfw,religious,racist,sexist,explicit,political"}
-        Else {$URI += "?blacklistFlags=nsfw,religious,explicit,political"}
-        $URI += "&amount=$Count"
-        #>
-
-        #endregion Build URI string
-
         #region Build URI string
-        
 
         # Base categories
         If ($Categories) {$URI = "https://v2.jokeapi.dev/joke/$($Categories -join(','))"}
         Else {$URI = "https://v2.jokeapi.dev/joke/Programming,Miscellaneous"}
         
-        # Always blocked
+        # Always blocked, sorry, I have to
         $Blacklist = @("racist","sexist")
 
         # Detect if Dark category is used
@@ -126,9 +115,8 @@ Function Get-PKJOTD {
 
         #endregion Build URI string
 
-
-        $Msg = "Use Invoke-WebRequest and jokeapi.dev to get jokes!"
-        Write-Verbose "[BEGIN:  $ScriptName] $Msg"       
+        $Msg = "Use Invoke-WebRequest and jokeapi.dev to get some dumb jokes!"
+        Write-Verbose "[BEGIN: $ScriptName] $Msg"
     }
     Process {  
 
@@ -168,8 +156,15 @@ Function Get-PKJOTD {
                     @{N="ID";E={$_.id}},
                     @{N="Joke";E={
                         If ($_.type -eq 'single') {$_.joke}
-                        Elseif ($_.type -eq 'twopart') {"Q: $($_.setup)`nA: $($_.delivery)"}
-                    }}
+                        Elseif ($_.type -eq 'twopart') {
+                            If ($_.setup -match "\?$" ) {
+                                "Q: $($_.setup)`nA: $($_.delivery)"
+                            }
+                            Else {
+                                "$($_.setup)`n$($_.delivery)"
+                            }
+                        }
+                    }}    
             }
             Catch {
                 Throw $_.Exception.Message
@@ -178,6 +173,6 @@ Function Get-PKJOTD {
         Else {return}
     }
     End {
-        Write-Verbose "[END:  $ScriptName]"
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 } #end function   

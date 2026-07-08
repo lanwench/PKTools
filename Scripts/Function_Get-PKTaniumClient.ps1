@@ -5,21 +5,23 @@ Function Get-PKTaniumClient {
         Gets the Tanium Client service and registry configuration from one or more computers, using Get-WMIObject for downlevel compatibility
 
     .DESCRIPTION
-        Gets the Tanium Client service and registry configuration from one or more computers, using Get-WMIObject for downlevel compatibility
-        If no computer name specified, uses local computer
-        If a remote computer is specified, uses Invoke-Command to get the remote registry data
+        Retrieves Tanium Client service state and registry configuration using Get-WmiObject for downlevel compatibility
+        Defaults to the local computer; uses Invoke-Command for remote registry queries
         Accepts pipeline input
         Returns a PSObject
+        Windows only
 
     .NOTES
         Name    : Function_Get-PKTaniumClient.ps1
+        Created : 2024-02-12
         Author  : Paula Kingsley
-        Version : 01.00.0000
+        Version : 01.03
         History :
-        
-            ** PLEASE KEEP $VERSION UPDATED IN BEGIN BLOCK **
 
-            v01.00.0000 - 2024-02-12 - Created script
+            ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+            v01.00 - 2024-02-12 - Created script
+            v01.03 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 
     .PARAMETER ComputerName
@@ -39,7 +41,7 @@ Function Get-PKTaniumClient {
             ComputerName  
             Credential    System.Management.Automation.PSCredential
             ScriptName    Get-PKTaniumClient
-            ScriptVersion 1.2.0
+            ScriptVersion 01.03
             PipelineInput False
 
 
@@ -84,20 +86,28 @@ Function Get-PKTaniumClient {
     Begin {
     
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.02.0000"
+        [version]$Version = "01.03"
 
         # How did we get here?
+        $ScriptName = $MyInvocation.MyCommand.Name
+        $Source = $PSCmdlet.ParameterSetName
         [switch]$PipelineInput = $MyInvocation.ExpectingInput
         $CurrentParams = $PSBoundParameters
-        $ScriptName = $MyInvocation.MyCommand.Name
         $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
         Where-Object { Test-Path Variable:$_ } | Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+        $CurrentParams.Add("ParameterSetName", $Source)
+        $CurrentParams.Add("PipelineInput", $PipelineInput)
         $CurrentParams.Add("ScriptName", $ScriptName)
         $CurrentParams.Add("ScriptVersion", $Version)
-        $CurrentParams.Add("PipelineInput", $PipelineInput)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
+
+        If ($IsWindows -eq $False) {
+            $Msg = "This function requires Windows"
+            Write-Error $Msg
+            Return
+        }
 
         $Param = @{
             ErrorAction = "Stop"
@@ -212,6 +222,6 @@ Function Get-PKTaniumClient {
     }
     End {
         Write-Progress -Activity * -Completed
-        Write-Verbose "[END: $ScriptName]"
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 } #end Get-PSGitStatus

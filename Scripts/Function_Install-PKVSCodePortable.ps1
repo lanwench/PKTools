@@ -1,8 +1,8 @@
 #requires -version 4
 Function Install-PKVSCodePortable {
     <#
-.SYNOPSIS 
-    Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself! 
+.SYNOPSIS
+    Downloads and installs or updates VSCode Portable from code.visualstudio.com
 
 .DESCRIPTION
     Downloads and installs or updates VSCode Portable in a specified target directory, since Portable can't update itself
@@ -12,20 +12,22 @@ Function Install-PKVSCodePortable {
     -ForceUpdate parameter will download/overwrite even if current version is the latest; -KillRunningProcess will stop any running VSCode Portable process in the specified path (requires elevation).
     Supports ShouldProcess
     Writes to a log file in the target directory for tracking
+    Windows only
 
 .NOTES
     Name    : Function_Install-PKVSCodePortable.ps1
     Created : 2024-04-17
     Author  : Paula Kingsley
-    Version : 01.03.0000
+    Version : 01.04
     History :
-    
+
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2024-04-17 - Created script
-        v01.01.0000 - 2024-07-22 - Updates and fixes
-        v01.02.0000 - 2024-10-25 - Fixed error in continue
-        v01.03.0000 - 2025-01-31 - Added backup option
+        v01.00 - 2024-04-17 - Created script
+        v01.01 - 2024-07-22 - Updates and fixes
+        v01.02 - 2024-10-25 - Fixed error in continue
+        v01.03 - 2025-01-31 - Added backup option
+        v01.04 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .LINK
     https://stackoverflow.com/questions/25125818/powershell-invoke-webrequest-how-to-automatically-use-original-file-name
@@ -86,22 +88,29 @@ Function Install-PKVSCodePortable {
     Begin {
 
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.03.0000"
+        [version]$Version = "01.04"
 
         # How did we get here?
-        [switch]$PipelineInput = $MyInvocation.ExpectingInput
+        $ScriptName = $MyInvocation.MyCommand.Name
         $Source = $PSCmdlet.ParameterSetName
+        [switch]$PipelineInput = $MyInvocation.ExpectingInput
 
         $CurrentParams = $PSBoundParameters
-        $ScriptName = $MyInvocation.MyCommand.Name
         $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
         Where-Object { Test-Path Variable:$_ } | Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+        $CurrentParams.Add("ParameterSetName",$Source)
         $CurrentParams.Add("ScriptName", $ScriptName)
         $CurrentParams.Add("ScriptVersion", $Version)
         $CurrentParams.Add("PipelineInput", $PipelineInput)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
+
+        If ($IsWindows -eq $False) {
+            $Msg = "This function requires Windows"
+            Write-Error $Msg
+            Return
+        }
 
         # We can't commit suicide - although this could be a different executable, I guess. Let's be safe anyway.
         If ($Host.Name -match "Visual Studio") {
@@ -437,8 +446,8 @@ Function Install-PKVSCodePortable {
     } #end process
 
     End {
-        Write-Progress -Activity * -Completed 
-        Write-Verbose "[END $ScriptName]"
+        Write-Progress -Activity * -Completed
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 } #end Install-PKVSCodePortable
 

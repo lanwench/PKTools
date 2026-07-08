@@ -1,22 +1,24 @@
 ﻿#Requires -version 4
 Function Get-PKTree {
 <#
-.SYNOPSIS 
-    Invokes Get-ChildItem -Recurse to return files, folders (or both) on the current or other directory, with options for depth, string matching, and output type
+.SYNOPSIS
+    Lists files and folders recursively from the current or specified directory, with filtering and output options
 
 .DESCRIPTION
-    Invokes Get-ChildItem -Recurse to return files, folders (or both) on the current or other directory, with options for depth, string matching, and output type
-    Returns a System.IO.FileSystemInfo object or a string
+    Wraps Get-ChildItem -Recurse with options for files, folders, or both, configurable depth, and string matching
+    Returns a System.IO.FileSystemInfo object or a formatted string
 
 .NOTES
     Name    : Function_Get-PKTree.ps1
+    Created : 2023-03-02
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01
     History :
-    
+
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2023-03-02 - Created script
+        v01.00 - 2023-03-02 - Created script
+        v01.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .PARAMETER Path
     Starting path for search (default is current directory)
@@ -51,7 +53,7 @@ Function Get-PKTree {
         PipelineInput   False                            
         ReturnNamesOnly False                            
         ScriptName      Get-PKTree                       
-        ScriptVersion   1.0.0                            
+        ScriptVersion   01.01
 
         VERBOSE: [BEGIN: Get-PKTree] Return file and directory object(s) matching '*.psd1', '*.md' (unlimited depth) 
         VERBOSE: [C:\Users\jbloggs\repos] Searching...
@@ -147,14 +149,15 @@ Param (
 ) 
 Begin {
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01"
 
     # How did we get here?
+    $ScriptName = $MyInvocation.MyCommand.Name
+    $Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $CurrentParams = $PSBoundParameters
-    $ScriptName = $MyInvocation.MyCommand.Name
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path Variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path Variable:$_} | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
     $CurrentParams.Add("PipelineInput",$PipelineInput)

@@ -1,4 +1,4 @@
-#reqiures -Version 4
+#requires -Version 4
 Function Get-PKGoogleFSLogErrors {
 <#
 .SYNOPSIS
@@ -13,11 +13,13 @@ Function Get-PKGoogleFSLogErrors {
     Name    : Function_Get-PKGoogleFSLogErrors.ps1
     Created : 2025-12-22
     Author  : Paula Kingsley
-    Version : 01.00.1000
-    History: 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
+    Version : 01.01
+    History :
 
-        v01.00.0000 - 2025-12-22 - Created script
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+        v01.00 - 2025-12-22 - Created script
+        v01.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 
 .PARAMETER LogPath
@@ -84,22 +86,24 @@ Function Get-PKGoogleFSLogErrors {
     )
     Begin {
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.00.0000"
+        [version]$Version = "01.01"
 
         # Show our settings
         $ScriptName = $MyInvocation.MyCommand.Name
-        $CurrentParams = $PSBoundParameters
+        $Source = $PSCmdlet.ParameterSetName
         [switch]$PipelineInput = $MyInvocation.ExpectingInput
-        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
+        $CurrentParams = $PSBoundParameters
+        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } |
         Where-Object { Test-Path variable:$_ } | Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-        $CurrentParams.Add("ScriptName", $ScriptName)
+        $CurrentParams.Add("ParameterSetName", $Source)
         $CurrentParams.Add("PipelineInput", $PipelineInput)
+        $CurrentParams.Add("ScriptName", $ScriptName)
         $CurrentParams.Add("ScriptVersion", $Version)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
 
-        Write-Verbose "[BEGIN: $ScriptName] Get certificate details on port $Port"
+        Write-Verbose "[BEGIN: $ScriptName] Scan Google Drive FileSync log files for errors"
     }
     Process {
         Write-Verbose "Scanning $LogPath for last $NumFiles Google Drive client log files containing errors"
@@ -120,6 +124,9 @@ Function Get-PKGoogleFSLogErrors {
         Catch {
             Write-Warning $_.Exception.Message
         }
+    }
+    End {
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 } # end Get-PKGoogleFSLogErrors
 

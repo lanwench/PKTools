@@ -15,14 +15,15 @@ Function Get-PKInputObjectType {
         Name    : Function_Get-PKInputObjectType.ps1
         Author  : Paula Kingsley
         Created : 2024-10-25
-        Version : 01.00.0000
+        Version : 01.01
         History :
-    
-        ** PLEASE KEEP $VERSION UPDATED IN BEGIN  BLOCK! **
-    
-        v01.00.0000 - 2024-10-25 - Created script
 
-        
+            ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+            v01.00 - 2024-10-25 - Created script
+            v01.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
+
+
     .PARAMETER InputObject
         The object whose type needs to be determined.
 
@@ -40,25 +41,25 @@ Function Get-PKInputObjectType {
     Begin {
 
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.00.0000"
+        [version]$Version = "01.01"
 
         # Show our settings
         $ScriptName = $MyInvocation.MyCommand.Name
-        $CurrentParams = $PSBoundParameters
         $Source = $PSCmdlet.ParameterSetName
         [switch]$PipelineInput = $MyInvocation.ExpectingInput
+        $CurrentParams = $PSBoundParameters
         $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
             Where-Object {Test-Path variable:$_}| ForEach-Object {
                 $CurrentParams.Add($_, (Get-Variable $_).value)
             }
         $CurrentParams.Add("ParameterSetName",$Source)
         $CurrentParams.Add("PipelineInput",$PipelineInput)
-        $CurrentParams.Add("ScriptName",$Scriptname)
-        $CurrentParams.Add("Version",$Version)
+        $CurrentParams.Add("ScriptName",$ScriptName)
+        $CurrentParams.Add("ScriptVersion",$Version)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
         
 
-        Write-Verbose "[BEGIN: $Scriptname] Identifying certain types of trees from very, very far away..."
+        Write-Verbose "[BEGIN: $ScriptName] Identifying certain types of trees from very, very far away..."
     }
     
     Process {
@@ -98,9 +99,11 @@ Function Get-PKInputObjectType {
                 FullName    = $Identity.GetType().FullName.ToString()
                 BaseType    = $Identity.GetType().BaseType.Name
             }
+        } # end Foreach
+    } # end Process
+    End {
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
-}
-
 } #end Get-PKADInputObjectType
 
 

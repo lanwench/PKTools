@@ -1,4 +1,4 @@
-﻿#requires -Version 3
+﻿#requires -Version 4
 Function ConvertTo-PKCSV {
 <#
 .SYNOPSIS
@@ -9,19 +9,19 @@ Function ConvertTo-PKCSV {
     Handy when you want to paste output into a spreadsheet or table and not remember all the necessary parameters or perform string manipulation
 
 .NOTES
-    Name    : Function_ConvertTo-PKCSV.ps1 
+    Name    : Function_ConvertTo-PKCSV.ps1
     Created : 2019-04-11
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK ** 
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2019-04-11 - Created script
-
+        v01.00 - 2019-04-11 - Created script
+        v01.01 - 2026-06-16 - Cosmetic updates; converted version format to major.minor
 
 .PARAMETER Object
-    PSbject to convert to CSV
+    PSObject to convert to CSV
 
 .PARAMETER Delimiter
     Delimiter (defaults to culture standard)
@@ -31,9 +31,6 @@ Function ConvertTo-PKCSV {
 
 .PARAMETER NoHeader
     Return CSV output without first row
-
-.PARAMETER Quiet
-    Suppress non-verbose console output
 
 .EXAMPLE
     PS C:\> Get-Service | Where-Object {$_.Status -ne "Running"} | Select-Object Status,StartType,Name,DisplayName | ConvertTo-PKCSV -Verbose | Select-Object -First 20
@@ -52,7 +49,7 @@ Function ConvertTo-PKCSV {
         ParameterSetName                
         PipelineInput    True           
         ScriptName       ConvertTo-PKCSV
-        ScriptVersion    1.0.0          
+        ScriptVersion    01.01
 
         BEGIN  : Convert object to CSV with the following options: Specify -NoTypeInformation, use default culture delimiter
         VERBOSE: 153 items in object
@@ -143,26 +140,23 @@ Param(
         HelpMessage = "Return CSV output without quotes"
     )]
     [Alias("RemoveQuotes")]
-    [switch]$NoQuotes,
+    [switch]$NoQuotes
 
-    [Parameter(
-        HelpMessage = "Suppress non-verbose console output"
-    )]
-    [Switch]$Quiet
 )
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01"
 
     # How did we get here
     $ScriptName = $MyInvocation.MyCommand.Name
+    $Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
 
     # Display parameters
     $CurrentParams = $PSBoundParameters
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path variable:$_} | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
     $CurrentParams.Add("ParameterSetName",$Source)
@@ -204,25 +198,18 @@ Begin {
     If ($NoHeader.IsPresent) {$Actions += "skip first row as header"}
     If ($NoQuotes.IsPresent) {$Actions += "remove quotation marks"}
     $Activity = $Actions -join(", ")
-    $Msg = "BEGIN  : $Activity"
-    $FGColor = "Yellow"
-    If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
-    Else {Write-Verbose $Msg}
+    
+    Write-Verbose "[BEGIN: $ScriptName] $Activity"
 
 }
 Process {
     
     # We're going to collect everything in the pipeline into a single object so we can run the actual cmdlet in End and not get
     # each individual row output to CSV with the header repeated (!)
-    If ($PipelineInput.IsPresent) {
-        $Collection += $_
-    }
-    Else {
-        $Collection += $Object
-    }
+    If ($PipelineInput.IsPresent) {$Collection += $_}
+    Else {$Collection += $Object}
 }
-End {
-    
+End {    
     $Msg =  "$($Collection.count) items in object"
     Write-Verbose $Msg
 
@@ -246,15 +233,11 @@ End {
     }
     Catch {
         $Msg = "Operation failed"
-        If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}
-        If (-not $Quiet.IsPresent) {$Host.UI.WriteErrorLine("ERROR  : $Msg")}
-        Else {Write-Verbose $Msg}
+        If ($ErrorDetails = $_.Exception.Message) {$Msg += "; $ErrorDetails"}        
+        Write-Warning $Msg
     }
     Finally {
-        $Msg = "END    : $Activity"
-        $FGColor = "Yellow"
-        If (-not $Quiet.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
-        Else {Write-Verbose $Msg}
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 }
 } #end ConvertTo-PKCSV

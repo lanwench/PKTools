@@ -6,19 +6,20 @@ Function Remove-PKAttributeBit {
 
 .DESCRIPTION
     Removes one or more filesystem attribute bits from one or more files or folders (recursive)
-    Accepts pipeline input
-    Returns a PSobject
+    Accepts pipeline input; returns a PSObject
+    Windows only
 
 .NOTES        
     Name    : Function_Remove-PKAttributeBit.ps1
     Created : 2019-12-31
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
-        
-        v01.00.0000 - 2019-12-31 - Created script based on Ed Wilson's original
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+        v01.00 - 2019-12-31 - Created script based on Ed Wilson's original
+        v01.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
         # Future plans? 
         ...figure out how to apply multiple attribute changes at once
@@ -51,7 +52,7 @@ Function Remove-PKAttributeBit {
         Verbose       True                       
         Quiet         False                      
         ScriptName    Remove-PKAttributeBit      
-        ScriptVersion 1.0.0                      
+        ScriptVersion 01.01                      
         PipelineInput False                      
 
         WARNING: Attribute 'kittens' not in Archive,Hidden,Normal,ReadOnly,System
@@ -163,15 +164,12 @@ Function Remove-PKAttributeBit {
 
         END  : Remove filesystem object attributes 'Hidden', 'ReadOnly'
 
-
-
-    
 #>
 
-[Cmdletbinding(
-    SupportsShouldProcess=$True,
-    ConfirmImpact="High"
-)]    
+[CmdletBinding(
+    SupportsShouldProcess = $True,
+    ConfirmImpact = "High"
+)]
 Param(
     [Parameter(
         ValueFromPipeline = $True,
@@ -187,45 +185,42 @@ Param(
         HelpMessage = "One or more filesystem attributes: Archive, Hidden, Normal, ReadOnly, System"
     )]
     [ValidateNotNullOrEmpty()]
-    $Attributes,
-
-    [Parameter(
-        HelpMessage = "Hide all non-verbose console output"
-    )]
-    [Alias("SuppressConsoleOutput")]
-    [Switch] $Quiet
-
+    $Attributes
 )
 Begin {
     
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01"
 
     # Show our settings
-    #$Source = $PSCmdlet.ParameterSetName
+    $Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
-    
+    $ScriptName = $MyInvocation.MyCommand.Name
     $CurrentParams = $PSBoundParameters
     $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
         Where-Object {Test-Path variable:$_}| ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-    $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
-    $CurrentParams.Add("ScriptVersion",$Version)
+    $CurrentParams.Add("ParameterSetName",$Source)
     $CurrentParams.Add("PipelineInput",$PipelineInput)
+    $CurrentParams.Add("ScriptName",$ScriptName)
+    $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
+
+    If ($IsWindows -eq $False) {
+        $Msg = "This function requires Windows"
+        Write-Error $Msg
+        Return
+    }
 
     # Preferences 
     $ErrorActionPreference = "Stop"
     $ProgressPreference    = "Continue"
 
     #region Attributes
-    
-    #$AvailableAttributes = [enum]::GetValues([system.io.fileattributes])
     $FileSystemAttributes = "Archive","Hidden","Normal","ReadOnly","System"
-
     $AttributeArr = @()
-    $Attributes | Foreach-Object {
+    $Attributes | ForEach-Object {
         If ($_ -in $FileSystemAttributes) {
             $AttributeArr += [io.fileattributes]::$_ 
         }
@@ -235,37 +230,12 @@ Begin {
     }
     If (-not $AttributeArr) {
         $Msg = "No valid attributes provided; script will exit"
-        $Host.UI.WriteErrorLine($Msg)
-        Break
-    }
-    Else {
-        #Write-Verbose "Attributes: $($AttributeArr -join(", "))"
+        Write-Error $Msg
+        Return
     }
     
     #endregion Attributes
 
-    #region Functions
-
-    # Function to write a console message or a verbose message
-    Function Write-MessageInfo {
-        Param([Parameter(ValueFromPipeline)]$Message,$FGColor,[switch]$Title)
-        $BGColor = $host.UI.RawUI.BackgroundColor
-        If (-not $Quiet.IsPresent) {
-            If ($Title.IsPresent) {$Message = "`n$Message`n"}
-            $Host.UI.WriteLine($FGColor,$BGColor,"$Message")
-        }
-        Else {Write-Verbose "$Message"}
-    }
-
-    # Function to write an error as a string (no stacktrace)
-    Function Write-MessageError {
-        [CmdletBinding()]
-        Param([Parameter(ValueFromPipeline)]$Message)
-        $Host.UI.WriteErrorLine("$Message")
-    }
-
-    #endregion Functions
-    
     #region Splats
 
     # Splat for Set-ItemProperty
@@ -282,36 +252,28 @@ Begin {
 
     # Console output
     $Activity = "Remove filesystem object attributes '$($AttributeArr -join("', '"))'"
-    $Msg = "BEGIN  : $Activity"
-    $Msg | Write-MessageInfo -FGColor Yellow -Title
-
+    Write-Verbose "[BEGIN: $ScriptName] $Activity"
 }
 Process {
 
     $TotalPaths = $Path.Count
     $CurrentPath = 0
     
-    Foreach ($P in $Path) {
-        
-        If ($PathObj = Get-Item -Path $P) {            
-            
+    ForEach ($P in $Path) {
+        If (Test-Path -Path $P) {            
             $Results = @()
             $Items = Get-ChildItem -Path $P -Recurse -Force
-        
             $CurrentPath ++
             Write-Progress -Activity "Remove attribute bits" -ID 1 -CurrentOperation $Path -PercentComplete ($CurrentPath/$TotalPaths*100)
-
             $TotalItems = $Items.Count
             $currentItem = 0
         
-            Foreach ($Item in $Items){
-            
+            ForEach ($Item in $Items){
                 $CurrentItem ++
 
-                Foreach ($Attr in $AttributeArr) {
-                
+                ForEach ($Attr in $AttributeArr) {
                     $CurrentValue = (Get-ItemProperty -Path $Item.fullname).attributes -band $Attr
-                    $Output = [pscustomobject]@{
+                    $Output = [PSCustomobject]@{
                         ComputerName  = $Env:ComputerName
                         Item          = $Item.FullName
                         AttributeName = $Attr
@@ -319,32 +281,27 @@ Process {
                         NewValue      = $Null
                         Messages      = $Null
                     }
-                
+            
                     Write-Progress -Activity "Remove $Attr attribute bit" -CurrentOperation $Item.FullName -ID 2 -PercentComplete ($CurrentItem/$TotalItems*100)
+            
                     If ($CurrentValue) {
-
                         $Msg = "Remove $Attr attribute bit"
                         Write-Verbose "[$($Item.FullName)] $Msg"
                         
                         If ($PSCmdlet.ShouldProcess($Item.FullName,"`n`n`t$Msg`n`n")) {
-                            
                             $Param_Set.Path = $Item.FullName
                             $Param_Set.Value = ((Get-ItemProperty $Item.fullname).attributes -BXOR $Attr)
                             Set-ItemProperty @Param_Set 
-                            
                             $NewValue = (Get-ItemProperty -Path $Item.fullname).attributes -band $Attr
-                            
                             $Msg = "Successfully removed attribute bit"
                             Write-Verbose "[$($Item.FullName)] $Msg"
-
                             $Output.NewValue = $NewValue
                             $Output.Messages = $Msg
-
+                        
                         } #end if confirmed
                         Else {
                             $Msg = "Operation cancelled by user"
                             Write-Verbose "[$($Item.FullName)] $Msg"
-
                             $Output.NewValue = "-"
                             $Output.Messages = $Msg
 
@@ -356,8 +313,8 @@ Process {
                         Write-Verbose "[$($Item.FullName)] $Msg"
                         $Output.ExistingValue = $Output.NewValue = "-"
                         $Output.Messages = $Msg
-                    }
 
+                    }
                     $Results += $Output
 
                 } #end for each attribute
@@ -370,15 +327,11 @@ Process {
         Else {
             Write-Warning "Invalid path '$P'"
         }
-  
     } # end for each path                   
 } 
 End {
-    Write-Progress -Activity * -Complete
-    
-    $Msg = "END  : $Activity"
-    $Msg | Write-MessageInfo -FGColor Yellow -Title
-    
+    $Null = Write-Progress -Activity * -Completed
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 } 
 } #end Remove-PKAttributeBit
 

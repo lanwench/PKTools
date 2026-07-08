@@ -1,4 +1,4 @@
-#required -Version 3
+#requires -Version 3
 Function Get-PKPSVersions {
 <#
 .SYNOPSIS
@@ -29,12 +29,13 @@ Function Get-PKPSVersions {
     Name    : Function_Get-PKPSVersions.ps1
     Created : 2025-05-22
     Author  : Paula Kingsley
-    Version : 012.00.0000
+    Version : 01.01
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
-        
-        v01.00.0000 - 2025-05-22 - Created script
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+        v01.00 - 2025-05-22 - Created script
+        v01.01 - 2026-06-17 - Cosmetic updates; corrected version typo; converted version format to major.minor
 
 .EXAMPLE
     PS C:\> Get-PKPSVersions -Verbose 
@@ -47,7 +48,7 @@ Function Get-PKPSVersions {
         PSCorePaths      {C:\Program Files\PowerShell, C:\Program Files (x86)\PowerShell}
         ParameterSetNAme Custom
         ScriptName       Get-PKPSVersions
-        ScriptVersion    1.0.0
+        ScriptVersion    01.01
 
         VERBOSE: Looking for PowerShell versions on LAPTOP145
         VERBOSE: Current script is running in version 7.5.1
@@ -73,7 +74,7 @@ Function Get-PKPSVersions {
         PSCorePaths      {C:\Program Files\PowerShell, C:\Program Files (x86)\PowerShell}
         ParameterSetNAme Path
         ScriptName       Get-PKPSVersions
-        ScriptVersion    1.0.0
+        ScriptVersion    01.01
 
         VERBOSE: Looking for PowerShell versions on LAPTOP19
         VERBOSE: Current script is running in version 7.5.1
@@ -106,19 +107,21 @@ Function Get-PKPSVersions {
     Begin {
     
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.00.0000"
+        [version]$Version = "01.01"
 
         # How did we get here
         $ScriptName = $MyInvocation.MyCommand.Name
-        
-        # Show our settings
         $Source = $PSCmdlet.ParameterSetName
+        [switch]$PipelineInput = $MyInvocation.ExpectingInput
+
+        # Show our settings
         $CurrentParams = $PSBoundParameters
         $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
         Where-Object { Test-Path variable:$_ } | Foreach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-        $CurrentParams.Add("ParameterSetNAme", $Source)
+        $CurrentParams.Add("ParameterSetName", $Source)
+        $CurrentParams.Add("PipelineInput", $PipelineInput)
         $CurrentParams.Add("ScriptName", $ScriptName)
         $CurrentParams.Add("ScriptVersion", $Version)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"

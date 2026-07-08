@@ -1,26 +1,27 @@
-﻿#requires -Version 3
+﻿#requires -Version 4
 Function ConvertTo-PKRegex {
 <#
 .SYNOPSIS
-    Escapes characters in one or more strings for nefarious regex purposes
+    Escapes special characters in one or more strings for use in regex patterns
 
 .DESCRIPTION
-    Escapes characters in one or more strings for nefarious regex purposes
-    Created because I always forget the syntax and frequently need to compare
-    strings / partial matches in an array
-    If -ReturnString is specified, joins results with | character
+    Uses [regex]::escape() to escape reserved regex characters in input strings
+    Accepts pipeline input or direct parameter input
+    If -ReturnString is specified, joins all escaped results with | for use in -match expressions
+    Returns escaped strings individually or as a single | -delimited pattern
 
 .NOTES
     Name    : Function_ConvertTo-PKRegex.ps1
     Created : 2017-11-13
-    Version : 02.00.0000
+    Version : 02.01
     Author  : Paula Kingsley
-    History:
-        
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK
+    History :
 
-        v01.00.0000 - 2017-11-13 - Created script
-        v02.00.0000 - 2023-08-03 - Renamed, added option for output as individual string(s) or single string 
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+        v01.00 - 2017-11-13 - Created script
+        v02.00 - 2023-08-03 - Renamed, added option for output as individual string(s) or single string
+        v02.01 - 2026-06-16 - Cosmetic updates; converted version format to major.minor
 
 .PARAMETER Text
     One or more strings (or arrays of strings), containing text / characters to escape
@@ -39,16 +40,16 @@ Function ConvertTo-PKRegex {
         Text             {f*teen, $ sign, dollar bill}
         ReturnString     False                        
         ScriptName       ConvertTo-PKRegex            
-        ScriptVersion    2.0.0                        
-        ParameterSetName Default                      
-        PipelineInput    False                        
+        ScriptVersion    02.01
+        ParameterSetName Default
+        PipelineInput    False
 
         VERBOSE: [BEGIN: ConvertTo-PKRegex] Escape characters in one or more text strings
         VERBOSE: Adding 'f*teen'
         VERBOSE: Adding '$ sign'
         VERBOSE: Adding 'dollar bill'
         VERBOSE: Total collection item count : 3
-        
+
         f\*teen
         \$\ sign
         dollar\ bill
@@ -58,17 +59,17 @@ Function ConvertTo-PKRegex {
 .EXAMPLE
     PS C:\> 'f*teen','$ sign','dollar bill' | ConvertTo-PKRegex -ReturnString -Verbose
 
-        VERBOSE: PSBoundParameters: 
-	
-        Key              Value            
-        ---              -----            
-        ReturnString     True             
-        Verbose          True             
-        Text                              
+        VERBOSE: PSBoundParameters:
+
+        Key              Value
+        ---              -----
+        ReturnString     True
+        Verbose          True
+        Text
         ScriptName       ConvertTo-PKRegex
-        ScriptVersion    2.0.0            
-        ParameterSetName String           
-        PipelineInput    True             
+        ScriptVersion    02.01
+        ParameterSetName String
+        PipelineInput    True
 
         VERBOSE: [BEGIN: ConvertTo-PKRegex] Escape characters in one or more text strings
         VERBOSE: Adding 'f*teen'
@@ -105,16 +106,16 @@ Param(
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "02.00.0000"
+    [version]$Version = "02.01"
 
     # How did we get here?
-    [switch]$PipelineInput = $MyInvocation.ExpectingInput
-    $CurrentParams = $PSBoundParameters
     $ScriptName = $MyInvocation.MyCommand.Name
     $Source = $PSCmdlet.ParameterSetName
+    [switch]$PipelineInput = $MyInvocation.ExpectingInput
+    $CurrentParams = $PSBoundParameters
 
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path variable:$_} | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
     $CurrentParams.Add("ScriptName",$ScriptName)
@@ -127,38 +128,33 @@ Begin {
     # Thank you as always, Jeff!
     $Data = [System.Collections.Generic.List[object]]::New()
 
-   $Activity = "Escape characters in one or more text strings"
-   If ($ReturnString.IsPresent) {$Activity += ", returning single string separated by | character"}
-   Write-Verbose "[BEGIN: $ScriptName] $Activity"
+    $Activity = "Escape characters in one or more text strings"
+    If ($ReturnString.IsPresent) {$Activity += ", returning single string separated by | character"}
+    Write-Verbose "[BEGIN: $ScriptName] $Activity"
 
 }
 Process {
-    
-    Foreach ($i in $Text) {
-        if ($i -is [array]) {
+    ForEach ($i in $Text) {
+        If ($i -is [array]) {
             $Msg = "Adding '$($i -join("', '"))'"
             Write-Verbose $Msg
             $Data.AddRange($i)
         }
-        else {
+        Else {
             $Msg = "Adding '$i'"
             Write-Verbose $Msg
             $Data.Add($i)
         }
     }
-
 }
 End {
     
     $Msg = "Total collection item count : $($Data.Count)"
     Write-Verbose $Msg
-
     $Output = ($Data | Foreach-Object {[regex]::escape($_) } )
-
     If ($ReturnString.IsPresent) {Write-Output ($Output -join "|")}
     Else {Write-Output $Output}
-   
-    Write-Verbose "[END: $ScriptName]"
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 }
 } #end ConvertTo-PKRegex
 

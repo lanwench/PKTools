@@ -4,20 +4,22 @@ Function Get-PKDateTimeExamples {
     Returns standard or unix format date/time formatting options with examples and descriptions
 
 .DESCRIPTION
-    Returns standard or unix format date/time formatting options with examples and descriptions
-    By default, returns a PSObject, but output can also be to console as write-host, table, or list format.
+    Displays a reference table of PowerShell Get-Date format specifiers with example output
+    Covers standard .NET format strings (default) or Unix-style UFormat strings (-Uformat)
+    Output can be returned as a PSObject (default), console table, list, or Write-Host
 
-.NOTES        
+.NOTES
     Name    : Function_Get-PKDateTimeExamples.ps1
     Created : 2023-09-27
     Author  : Paula Kingsley
-    Version : 01.01.0000
+    Version : 01.02
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK **
-        
-        v01.00.0000 - 2023-09-27 - Created script because I can never remember these things!
-        v01.01.0000 - 2023-09-28 - Added parameter to hide description from output
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
+
+        v01.00 - 2023-09-27 - Created script because I can never remember these things!
+        v01.01 - 2023-09-28 - Added parameter to hide description from output
+        v01.02 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .LINK
     https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-date?view=powershell-7.3
@@ -73,16 +75,19 @@ Function Get-PKDateTimeExamples {
     Begin {
     
         # Current version (please keep up to date from comment block)
-        [version]$Version = "01.00.0000"
+        [version]$Version = "01.02"
 
         # Show our settings
         $ScriptName = $MyInvocation.MyCommand.Name
-
+        $Source = $PSCmdlet.ParameterSetName
+        [switch]$PipelineInput = $MyInvocation.ExpectingInput
         $CurrentParams = $PSBoundParameters
-        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
+        $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } |
         Where-Object { Test-Path variable:$_ } | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
+        $CurrentParams.Add("ParameterSetName", $Source)
+        $CurrentParams.Add("PipelineInput", $PipelineInput)
         $CurrentParams.Add("ScriptName", $ScriptName)
         $CurrentParams.Add("ScriptVersion", $Version)
         Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
@@ -188,7 +193,7 @@ Function Get-PKDateTimeExamples {
         }
     }
     End {
-        Write-Verbose "[END: $ScriptName]"
+        Write-Verbose "[END: $ScriptName] Script ran successfully"
     }
 }
 

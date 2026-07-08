@@ -2,25 +2,25 @@
 Function New-PKJargonIpsum {
 <#
 .SYNOPSIS
-    Want a wall of mission statements? This function generates jargon-filled Lorem Ipsum text from internal dictionary arrays of words, 
-    so you can fit in at your next meeting!
+    Generates jargon-filled Lorem Ipsum-style corporate text using built-in word arrays
 
 .DESCRIPTION
-    Generates jargon-filled Lorem Ipsum text from internal dictionary arrays of words, so you can fit in at your next meeting!  
-    All available words are stored within the function; no external connectivity is required
-    It allows you to specify the number of sentences and paragraphs to generate, as well as the formatting options for 
-    dividing paragraphs and the starting word type for sentences.
+    Generates corporate-speak sentences and paragraphs from built-in word lists
+    All word data is stored within the function; no external connectivity required
+    Supports configurable sentence and paragraph counts, paragraph divider style, and whether sentences begin with a verb or adverb
+    Returns a formatted string
 
 .NOTES
     Name    : Function_New-PKJargonIpsum.ps1
     Created : 2024-04-26
     Author  : Paula Kingsley
-    Version : 01.00.0000
+    Version : 01.01
     History :
-    
+
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2024-04-24\6 - Created script based on Tom Sherman's json data from link
+        v01.00 - 2024-04-26 - Created script based on Tom Sherman's json data from link
+        v01.01 - 2026-06-17 - Cosmetic updates; converted version format to major.minor
 
 .PARAMETER NumSentence
     Specifies the number of sentences to generate. Must be an even number between 2 and 100.
@@ -42,7 +42,7 @@ Function New-PKJargonIpsum {
     PS C:\> New-PKJargonIpsum -NumSentence 10 -NumParagraph 2 -Divider Space 
     Generates 10 sentences divided into 2 paragraphs, with each paragraph separated by a space. Sentences start with adverbs.
 #>
-[Cmdletbinding()]
+[CmdletBinding()]
 Param(
     [Parameter(
         Position = 0,
@@ -75,16 +75,18 @@ Param(
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.00.0000"
+    [version]$Version = "01.01"
 
     # Show our settings
     $ScriptName = $MyInvocation.MyCommand.Name
+    $Source = $PSCmdlet.ParameterSetName
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $CurrentParams = $PSBoundParameters
-    $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } | 
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object { $CurrentParams.keys -notContains $_ } |
     Where-Object { Test-Path variable:$_ } | ForEach-Object {
         $CurrentParams.Add($_, (Get-Variable $_).value)
     }
+    $CurrentParams.Add("ParameterSetName",$Source)
     $CurrentParams.Add("PipelineInput", $PipelineInput)
     $CurrentParams.Add("ScriptName", $ScriptName)
     $CurrentParams.Add("ScriptVersion", $Version)
@@ -657,7 +659,7 @@ Process {
         }
         
         # Then we prepend with a statement opening
-        $Statements = Foreach ($y in $CombinedSentences)  {
+        $Statements = ForEach ($y in $CombinedSentences)  {
             "$($StatementOpenings | Get-Random -Count 1) $y."
         } 
         
@@ -677,7 +679,7 @@ Process {
 
 }
 End {
-    Write-Verbose "[END: $ScriptName]"
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
 }
 } #end function
 

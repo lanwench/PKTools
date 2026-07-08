@@ -1,27 +1,31 @@
-﻿#requires -Version 3
+﻿#requires -Version 4
 Function Backup-PKChromeProfile {
 <#
 .SYNOPSIS
-    Backs up Chrome profiles to file
+    Backs up Google Chrome user profile data to a date-stamped folder
 
 .DESCRIPTION
-    Backs up Chrome profiles to file
-    Optional -IncludeCache switch
-    Stops Chrome if running
-    Supports ShouldProcess
-    Outputs a PSObject
+    Backs up Google Chrome user profile data to a date-stamped folder in the target path
+    Backs up all user data or profile folders only (-SourceType ProfilesOnly)
+    Optionally includes cache files (-IncludeCache); excluded by default
+    Stops Chrome if running before copying
+    Supports -WhatIf and -Confirm (ShouldProcess)
+    Windows only
+    Requires Chrome installed at the default LocalAppData path
+    Returns a PSObject
 
 .NOTES
     Name    : Function_Backup-PKChromeProfile
     Created : 2018-04-16
     Author  : Paula Kingsley
-    Version : 01.01.0000
+    Version : 01.02
     History :
 
-        ** PLEASE KEEP $VERSION UP TO DATE IN BEGIN BLOCK
+        ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
-        v01.00.0000 - 2018-04-16 - Created script
-        v01.01.0000 - 2018-08-29 - Updated, added comment block
+        v01.00 - 2018-04-16 - Created script
+        v01.01 - 2018-08-29 - Updated, added comment block
+        v01.02 - 2026-06-16 - Cosmetic updates; converted version format to major.minor
 
 .PARAMETER ProfilePath
     Absolute path to source profile files; default is '$env:LOCALAPPDATA\Google\Chrome\User Data'
@@ -52,7 +56,7 @@ Function Backup-PKChromeProfile {
         IncludeCache          False                                                   
         SuppressConsoleOutput False                                                   
         ScriptName            Backup-PKChromeProfile                                  
-        ScriptVersion         1.1.0                                                   
+        ScriptVersion         01.02
 
         Action: Copy all Chrome user data to C:\Users\jbloggs\2018-08-29_04-30-54_Chrome_jbloggs-05122
 
@@ -74,7 +78,7 @@ Function Backup-PKChromeProfile {
         ProfilePath           C:\Users\jbloggs\AppData\Local\Google\Chrome\User Data
         SuppressConsoleOutput False                                                   
         ScriptName            Backup-PKChromeProfile                                  
-        ScriptVersion         1.1.0                                                   
+        ScriptVersion         01.02
 
         Action: Copy all Chrome user profile data folders to c:\temp\2018-08-29_04-11-49_Chrome_WORKSTATION22 (excluding cache files)
 
@@ -110,28 +114,34 @@ Param(
     [Parameter(
         HelpMessage = "Include cache files (this will slow down up processing)"
     )]
-    [switch]$IncludeCache, 
-
-    [Parameter(
-        HelpMessage = "Suppress all non-verbose/non-error console output"
-    )]
-    [switch]$SuppressConsoleOutput 
+    [switch]$IncludeCache
     
 )
 Begin{
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "01.01.0000"
+    [version]$Version = "01.02"
 
-    # Show our settings
+    # How did we get here?
+    $ScriptName = $MyInvocation.MyCommand.Name
+    $Source = $PSCmdlet.ParameterSetName
+    [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $CurrentParams = $PSBoundParameters
-    $MyInvocation.MyCommand.Parameters.keys | Where {$CurrentParams.keys -notContains $_} | 
-        Where {Test-Path variable:$_}| Foreach {
+    $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
+        Where-Object {Test-Path variable:$_} | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-    $CurrentParams.Add("ScriptName",$MyInvocation.MyCommand.Name)
+    $CurrentParams.Add("ParameterSetName",$Source)
+    $CurrentParams.Add("PipelineInput",$PipelineInput)
+    $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
     Write-Verbose "PSBoundParameters: `n`t$($CurrentParams | Format-Table -AutoSize | out-string )"
+
+    If ($IsWindows -eq $False) {
+        $Msg = "This function requires Windows"
+        Write-Error $Msg
+        Return
+    }
 
     # General-purpose splat
     $StdParams = @{
@@ -149,46 +159,39 @@ Begin{
         ProfilesOnly {$Msg = "Copy all Chrome user profile data folders to $Target"}
     }
     If ($ExcludeCache.IsPresent) {$Msg += " (excluding cache files)"}
+    $Activity = "Copy Chrome profile"
 
     # Make it look pretty
-    $Source = $ProfilePath.ToLower()
+    $SourcePath = $ProfilePath.ToLower()
 
-    # Console output
-    $BGColor = $host.UI.RawUI.BackgroundColor
-    $Msg = "Action: $Msg"
-    $Activity = $Msg
-    $FGColor = "Yellow"
-    If (-not $SuppressConsoleOutput.IsPresent) {$Host.UI.WriteLine($FGColor,$BGColor,$Msg)}
-    Else {Write-Verbose $Msg}
-    $Host.UI.WriteLine()
+    Write-Verbose "[BEGIN: $ScriptName] $Msg"
+    
 
 }
 Process {
 
-    Try {
-
-        # Set flag
-        [switch]$Continue = $False
+    # Set flag
+    [switch]$Continue = $False
         
+    Try {
         # Test path
         $Msg = "Look for Google profile files"
         Write-Verbose $Msg
         Write-Progress -Activity $Activity -CurrentOperation $Msg -Status Working
         
-        If ($Null = Test-Path $Source -ErrorAction SilentlyContinue -Verbose:$False) {
-            
+        If ($Null = Test-Path $SourcePath -ErrorAction SilentlyContinue -Verbose:$False) {
             $FileList = @()
-            $Msg = "Found Google profile(s) in '$Source'"
+            $Msg = "Found Google profile(s) in '$SourcePath'"
             Write-Verbose $Msg
-            
+
             # Get the source files using Get-ChildItem
             Switch ($SourceType) {
                 All {
-                    $Filelist = Get-Childitem $Source –Recurse @StdParams
+                    $Filelist = Get-ChildItem $SourcePath -Recurse @StdParams
                 }
                 ProfilesOnly {
-                    $FileList += (Get-ChildItem -Path $Source -Filter "default" -Recurse -Force @StdParams)
-                    $FileList += (Get-ChildItem -Path $Source -Filter "profile*" -Recurse -Force @StdParams)                        
+                    $FileList += (Get-ChildItem -Path $SourcePath -Filter "default" -Recurse -Force @StdParams)
+                    $FileList += (Get-ChildItem -Path $SourcePath -Filter "profile*" -Recurse -Force @StdParams)
                 }
             }
 
@@ -202,8 +205,8 @@ Process {
             $Continue = $True
         }
         Else {
-            $Msg = "Invalid path '$Source'"
-            $Host.UI.WriteErrorLine("ERROR: $Msg")
+            $Msg = "Invalid path '$SourcePath'"
+            Write-Error $Msg
         }
         
         # Continue if files found
@@ -214,14 +217,13 @@ Process {
             
             # Stop Chrome if it's running
             If ($ChromeProc = Get-Process chrome -ErrorAction SilentlyContinue) {
-            
                 $Msg = "Stop running Chrome process(es)"
                 Write-Verbose $Msg
                 Write-Progress -Activity $Activity -CurrentOperation $Msg -Status Working
 
                 $ConfirmMsg = "`n$Msg`n`n"
                 If ($PSCmdlet.ShouldProcess($Env:ComputerName,$Msg)) {
-                    $StopProc = $ChromeProc | Stop-Process -Force -PassThru -Confirm:$False @StdParams
+                    $Null = $ChromeProc | Stop-Process -Force -PassThru -Confirm:$False @StdParams
                     $Msg = "Stopped Chrome"
                     Write-Verbose $Msg
                     $Continue = $True
@@ -238,29 +240,21 @@ Process {
 
         # If Chrome isn't running, prompt to copy files
         If ($Continue.IsPresent) {
-
             Try {
-
-                $ConfirmMsg = "`n`n`tCopy $Source files to`n`t$Target`n`n"
+                $ConfirmMsg = "`n`n`tCopy $SourcePath files to`n`t$Target`n`n"
                 If ($PSCmdlet.ShouldProcess($Env:ComputerName,$ConfirmMsg)) {    
-                    
                     # Set counters
                     $Current = 0
                     $Total = $FileList.Count
-                    
                     $Msg = "Copy profile files to $Target"
                     Write-Verbose
 
-                    $CopyFiles = Foreach ($File in $Filelist) {
-                        
+                    Foreach ($File in $Filelist) {                        
                         $Current ++
-                        $TargetFile = $File.Fullname.tolower().replace($Source,'')
-
+                        $TargetFile = $File.Fullname.tolower().replace($SourcePath,'')
                         $DestinationFile = "$Target$TargetFile"
                         Write-Progress -Activity $Activity -CurrentOperation $File.FullName -Status "Copying file" -PercentComplete ($Current/$Total*100)
-
                         $Null = Copy-Item $File.FullName -Destination $DestinationFile -Force -PassThru -Confirm:$False @StdParams
-                    
                     }
 
                     $GetFiles = Get-ChildItem $Target -Recurse -File @StdParams
@@ -275,16 +269,17 @@ Process {
             Catch {
                 $Msg = "File copy failed"
                 If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
-                $Host.UI.WriteErrorLine("ERROR: $Msg")
+                Write-Error $Msg
             }
         }
     }
     Catch {
         $Msg = "Operation failed"
         If ($ErrorDetails = $_.Exception.Message) {$Msg += "`n$ErrorDetails"}
-        $Host.UI.WriteErrorLine("ERROR: $Msg")
+        Write-Error $Msg
     }
-
 }
-
+End {
+    Write-Verbose "[END: $ScriptName] Script ran successfully"
+}
 } #end Backup-PKChromeProfile
