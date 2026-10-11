@@ -7,7 +7,7 @@ Function Convert-PKBytes{
 .DESCRIPTION
     Determines the appropriate unit (B, KB, MB, GB, TB, or PB) for one or more given byte counts, or uses -TargetUnit to force a specific unit
     Optional -TargetUnit may be especially handy when piping multiple values that should all appear in the same unit for consistent comparison
-    Returns a PSObject with the raw quotient (Output), rounded display string (Formatted), and the target unit (ConvertTo)
+    Returns a PSObject containing the input Bytes, target unit (ConvertTo), whether rounding is applied (Rounding), the raw quotient (Output), and a rounded display string (Formatted)
     Without -Round, Output is the raw quotient and Formatted shows two decimal places
     With -Round, Output and Formatted both use whole numbers
     Accepts pipeline input
@@ -16,14 +16,14 @@ Function Convert-PKBytes{
     Name    : Function_Convert-PKBytes.ps1
     Created : 2018-02-13
     Author  : Paula Kingsley
-    Version : 02.00
+    Version : 03.00
     History :
 
         ** PLEASE KEEP $VERSION UPDATED IN PROCESS BLOCK **
 
         v01.00 - 2018-02-13 - Created script based on Boe Prox's original
         v02.00 - 2026-06-16 - Renamed, overhauled & added helper function, added Round param
-
+        v03.00 - 2026-07-17 - Changed -gt to -ge, updated verbose param output (clone), input byte cast to UInt64 
 .LINK
     https://learn-powershell.net/2010/08/29/convert-bytes-to-highest-available-unit/
 
@@ -46,7 +46,7 @@ Function Convert-PKBytes{
         ParameterSetName __AllParameterSets
         PipelineInput    False
         ScriptName       Convert-PKBytes
-        ScriptVersion    02.00
+        ScriptVersion    03.00
         Verbose          True
 
         VERBOSE: [BEGIN: Convert-PKBytes] Convert byte sizes to human-readable strings
@@ -93,19 +93,18 @@ Function Convert-PKBytes{
         # Auto-detect would have chosen GB for both; -TargetUnit MB forces a consistent unit
 
 #>
-
 [CmdletBinding()]
 Param(
     [Parameter(
-        Mandatory=$True,
+        Mandatory = $True,
         ValueFromPipeline = $True,
         ValueFromPipelineByPropertyName = $True,
-        Position=0,
+        Position = 0,
         HelpMessage = "One or more byte sizes (int64)"
     )]
     [ValidateNotNullOrEmpty()]
     [Alias("Size","Sum")]
-    [int64[]]$Bytes,
+    [UInt64[]]$Bytes,
 
     [Parameter(
         Position = 1,
@@ -123,22 +122,20 @@ Param(
 Begin {
 
     # Current version (please keep up to date from comment block)
-    [version]$Version = "02.00"
+    [version]$Version = "03.00"
 
-    # Capture before $PSBoundParameters is mutated by the enumeration below
+    # Capture before $PSBoundParameters is changed
     $TargetUnitSpecified = $PSBoundParameters.ContainsKey("TargetUnit")
     If ($TargetUnitSpecified) { $TargetUnit = $TargetUnit.ToUpper() }
 
-    # Show our settings
-    $Source = $PSCmdlet.ParameterSetName
+    # How did we get here?
     [switch]$PipelineInput = $MyInvocation.ExpectingInput
     $ScriptName = $MyInvocation.MyCommand.Name
-    $CurrentParams = $PSBoundParameters
+    $CurrentParams = [Hashtable]::New($PSBoundParameters)
     $MyInvocation.MyCommand.Parameters.keys | Where-Object {$CurrentParams.keys -notContains $_} |
         Where-Object {Test-Path variable:$_} | ForEach-Object {
             $CurrentParams.Add($_, (Get-Variable $_).value)
         }
-    $CurrentParams.Add("ParameterSetName",$Source)
     $CurrentParams.Add("PipelineInput",$PipelineInput)
     $CurrentParams.Add("ScriptName",$ScriptName)
     $CurrentParams.Add("ScriptVersion",$Version)
@@ -149,6 +146,10 @@ Begin {
         $Decimals = If ($Round) { 0 } Else { 2 }
         [math]::Round($Value / $Divisor, $Decimals)
     }
+
+    If ($TargetUnitSpecified) {
+        $PreCalculatedDivisor = @{ B=1; KB=1KB; MB=1MB; GB=1GB; TB=1TB; PB=1PB }[$TargetUnit]
+    }
     If ($TargetUnit) {$Msg = "Convert byte count to $TargetUnit units"}
     Else {$Msg = "Convert byte count to auto-detected highest possible unit"}
     If ($Round) {$Msg += " (rounded)"}
@@ -158,20 +159,23 @@ Begin {
 Process {
 
     ForEach ($Item in $Bytes) {
+        # If the user specified a unit, use the pre-calculated static divisor
         If ($TargetUnitSpecified) {
-            $Divisor = @{ B=1; KB=1KB; MB=1MB; GB=1GB; TB=1TB; PB=1PB }[$TargetUnit]
-            $Unit = $TargetUnit
+            $Divisor = $PreCalculatedDivisor
+            $Unit    = $TargetUnit
         }
+        # Otherwise, dynamically auto-detect based on specific item's size
         Else {
             $Divisor, $Unit = Switch ($Item) {
-                {$_ -gt 1PB} { 1PB, "PB";    Break }
-                {$_ -gt 1TB} { 1TB, "TB";    Break }
-                {$_ -gt 1GB} { 1GB, "GB";    Break }
-                {$_ -gt 1MB} { 1MB, "MB";    Break }
-                {$_ -gt 1KB} { 1KB, "KB";    Break }
+                {$_ -ge 1PB} { 1PB, "PB";    Break }
+                {$_ -ge 1TB} { 1TB, "TB";    Break }
+                {$_ -ge 1GB} { 1GB, "GB";    Break }
+                {$_ -ge 1MB} { 1MB, "MB";    Break }
+                {$_ -ge 1KB} { 1KB, "KB";    Break }
                 Default       { 1,   "B" }
             }
         }
+
         $Rounded = _FormatSize $Item $Divisor
         $OutputValue = If ($Round) { $Rounded } Else { $Item / $Divisor }
         Write-Verbose "Converting $Item bytes to $Unit"

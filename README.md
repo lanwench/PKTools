@@ -6,11 +6,11 @@
 |**Name** |PKTools|
 |**Author** |Paula Kingsley|
 |**Type** |Script|
-|**Version** |2.35|
+|**Version** |2.36|
 |**Description**|Various PowerShell tools, functions, demos, stuff, things|
-|**Date**|README.md file generated on Wednesday, July 8, 2026 1:53:33 PM|
+|**Date**|README.md file generated on Sunday, October 11, 2026 12:44:41 PM|
 
-This module contains 38 PowerShell functions or commands
+This module contains 39 PowerShell functions or commands
 
 All functions should have reasonably detailed comment-based help, accessible via Get-Help ... e.g., 
   * `Get-Help Do-Something`
@@ -31,7 +31,7 @@ Clone/copy entire module directory into a valid PSModules folder on your compute
 
 _All code should be presumed to be written by Paula Kingsley unless otherwise specified (see the context help within each function for more information, including credits)._
 
-_Changelogs are generally found within individual functions, not per module._
+__Per-function change details are generally found within each function's Notes, but a CHANGELOG.md file contains a summary of changes across all module functions.__
 
 ## Commands
 
@@ -39,7 +39,7 @@ _Changelogs are generally found within individual functions, not per module._
 |---|---|---|
 |<span style="white-space: nowrap">**Backup-PKChromeProfile**</span>|01.02|Backs up Google Chrome user profile data to a date-stamped folder|
 |<span style="white-space: nowrap">**Backup-PKVSCodeData**</span>|01.01|Backs up the VSCode \Data folder to a date-stamped zip file|
-|<span style="white-space: nowrap">**Convert-PKBytes**</span>|02.00|Converts one or more byte counts to a human-readable unit, auto-detecting or using a specified target unit|
+|<span style="white-space: nowrap">**Convert-PKBytes**</span>|03.00|Converts one or more byte counts to a human-readable unit, auto-detecting or using a specified target unit|
 |<span style="white-space: nowrap">**Convert-PKCollectionToString**</span>|01.02|Converts object properties containing collections (arrays) into flattened strings<br/>for safe and clean export to CSV, avoiding the [system]System.Object[] value|
 |<span style="white-space: nowrap">**Convert-PKEXchangeSMTPLog**</span>|01.01|Parses an Exchange send or receive connector log from a file (string or object) and returns a PSObject|
 |<span style="white-space: nowrap">**Convert-PKIISLog**</span>|01.01|Parses an IIS log from a file (string or object) and returns a PSObject|
@@ -67,6 +67,7 @@ _Changelogs are generally found within individual functions, not per module._
 |<span style="white-space: nowrap">**New-PKComplexPassword**</span>|01.01|Uses Get-Random and defined character sets to generate a password between 10 and 265 characters, with option to return secure string or plain text|
 |<span style="white-space: nowrap">**New-PKFakeIdentity**</span>|01.01|Generates one or more random fake identities via the randomuser.me API|
 |<span style="white-space: nowrap">**New-PKJargonIpsum**</span>|01.01|Generates jargon-filled Lorem Ipsum-style corporate text using built-in word arrays|
+|<span style="white-space: nowrap">**New-PKModule**</span>|01.01|Creates a new PowerShell module scaffold|
 |<span style="white-space: nowrap">**New-PKPassphrase**</span>|03.01|Uses REST API calls to generate one or more passphrases from English or Lorem Ipsum word lists|
 |<span style="white-space: nowrap">**Open-PKChrome**</span>|01.01|Launches a URL in Google Chrome with options for new window and default profile|
 |<span style="white-space: nowrap">**Remove-PKAttributeBit**</span>|01.01|Removes one or more filesystem attribute bits from one or more files or folders (recursive)|
